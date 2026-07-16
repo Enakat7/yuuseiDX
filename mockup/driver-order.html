@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>発注書 | YOU SAY!!</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="driver-shell">
+  <header class="driver-topbar">
+    <div class="logo">YOU SAY<span>!!</span></div>
+    <a href="login.html" style="color:#fff; text-decoration:none; font-size:12px;">ログアウト</a>
+  </header>
+
+  <nav class="driver-tabs">
+    <a href="driver-dashboard.html">ホーム</a>
+    <a href="driver-order.html" class="is-active">発注書</a>
+    <a href="driver-payment.html">支払通知書</a>
+  </nav>
+
+  <main class="driver-content">
+    <div class="content__header" style="margin-bottom:16px;">
+      <div>
+        <h2 style="font-size:20px;">発注書</h2>
+        <p class="content__lead">月末に翌月分の発注書（稼働表）が発行されます。</p>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__head">
+        <h3>2026年8月分</h3>
+        <span class="pill pill--confirmed">発行済</span>
+      </div>
+      <div class="panel__body">
+        <p class="text-sm text-muted">発行日：2026-07-31　/　稼働エリア：西 / 西A地区</p>
+        <div class="table-wrap" style="margin-top:14px;">
+          <table>
+            <thead>
+              <tr><th>週</th><th>稼働予定日数</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>第1週（8/1-8/7）</td><td>6日</td></tr>
+              <tr><td>第2週（8/8-8/14）</td><td>6日</td></tr>
+              <tr><td>第3週（8/15-8/21）</td><td>5日</td></tr>
+              <tr><td>第4週（8/22-8/31）</td><td>7日</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="flex" style="margin-top:18px;">
+          <button class="btn btn--primary">PDFダウンロード</button>
+          <button class="btn btn--ghost">CSVダウンロード</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel__head">
+        <h3>過去の発注書</h3>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>対象月</th><th>発行日</th><th>ステータス</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>2026年7月分</td><td>2026-06-30</td>
+              <td><span class="pill pill--confirmed">発行済</span></td>
+              <td><button class="btn btn--sm">PDF</button></td>
+            </tr>
+            <tr>
+              <td>2026年6月分</td><td>2026-05-31</td>
+              <td><span class="pill pill--alert">再発行</span></td>
+              <td><button class="btn btn--sm">PDF</button></td>
+            </tr>
+            <tr>
+              <td>2026年5月分</td><td>2026-04-30</td>
+              <td><span class="pill pill--confirmed">発行済</span></td>
+              <td><button class="btn btn--sm">PDF</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+</body>
+</html>
