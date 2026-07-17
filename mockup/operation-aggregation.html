@@ -19,7 +19,7 @@
       <a class="sidebar__link" href="operation-dashboard.html">ダッシュボード</a>
       <a class="sidebar__link is-active" href="operation-aggregation.html">件数集計</a>
       <a class="sidebar__link" href="operation-cost.html">管理費集計</a>
-      <a class="sidebar__link" href="operation-schedule.html">稼働表</a>
+      <a class="sidebar__link" href="operation-schedule.html">発注書(稼働表)</a>
       <a class="sidebar__link" href="operation-payment.html">支払通知書</a>
       <a class="sidebar__link" href="operation-advance.html">前払依頼書</a>
       <a class="sidebar__link" href="operation-master.html">マスタ管理</a>
@@ -52,7 +52,7 @@
             <option>2026年6月</option>
           </select>
           <button class="btn btn--ghost">CSVエクスポート</button>
-          <button class="btn btn--primary">一括承認</button>
+          <button class="btn btn--ghost">保存</button>
         </div>
       </div>
 
@@ -71,7 +71,11 @@
       <div class="panel">
         <div class="panel__head">
           <h3>件数内訳（種類別）</h3>
-          <span class="text-sm text-muted">2026/07/01 〜 07/16</span>
+          <div class="date-nav">
+            <button class="date-nav__btn" aria-label="前日">‹</button>
+            <span class="date-nav__value">2026/07/17</span>
+            <button class="date-nav__btn" aria-label="翌日">›</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
