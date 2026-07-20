@@ -427,6 +427,10 @@ img {
   margin-top: 0;
 }
 
+.grid + .panel {
+  margin-top: 24px;
+}
+
 .grid {
   display: grid;
   gap: 20px;
