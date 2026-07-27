@@ -5,7 +5,6 @@ import { useCurrentUser, userForRole, type OperationRole } from "@/lib/currentUs
 
 type Role = OperationRole | "ドライバー";
 
-const ROLES: Role[] = ["管理者", "スタッフ", "ドライバー"];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,22 +31,9 @@ export default function LoginPage() {
         <div className="login-card">
           <div className="logo-block">
             <div className="logo">
-              YOU SAY<span>!!</span>
+              郵政DX
             </div>
             <div className="sub">配送業務管理システム</div>
-          </div>
-
-          <div className="role-toggle">
-            {ROLES.map((r) => (
-              <button
-                key={r}
-                type="button"
-                className={"opt" + (role === r ? " is-active" : "")}
-                onClick={() => setRole(r)}
-              >
-                {r}
-              </button>
-            ))}
           </div>
 
           <form onSubmit={handleSubmit}>
