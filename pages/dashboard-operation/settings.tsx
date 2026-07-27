@@ -1,10 +1,7 @@
 import Head from "next/head";
 import OperationLayout from "@/components/OperationLayout";
 
-const ACCOUNTS = [
-  { name: "山田 太郎", role: "管理者" },
-  { name: "中村 恵", role: "スタッフ" },
-];
+const ACCOUNTS: { name: string; role: string }[] = [];
 
 const NOTIFICATIONS = [
   { label: "支払通知書 確定時のメール通知", on: true },
@@ -42,6 +39,13 @@ export default function SettingsPage() {
                     </tr>
                   </thead>
                   <tbody>
+                    {ACCOUNTS.length === 0 && (
+                      <tr>
+                        <td colSpan={3}>
+                          <p className="empty-note">登録済みのアカウントはありません。</p>
+                        </td>
+                      </tr>
+                    )}
                     {ACCOUNTS.map((account) => (
                       <tr key={account.name}>
                         <td>{account.name}</td>

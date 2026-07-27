@@ -18,65 +18,10 @@ type Row = {
   noteIsTag?: boolean;
 };
 
-const ROWS: Row[] = [
-  {
-    driver: "佐藤 一郎",
-    area: "西",
-    payType: "週払い",
-    amount: "184,200円",
-    status: "仮確定",
-    tone: "provisional",
-    statusLabel: "仮確定",
-    note: "—",
-  },
-  {
-    driver: "鈴木 花子",
-    area: "安佐南",
-    payType: "週払い",
-    amount: "156,800円",
-    status: "未承認",
-    tone: "pending",
-    statusLabel: "未承認",
-    note: "—",
-  },
-  {
-    driver: "高橋 健太",
-    area: "中央(中区)",
-    payType: "月払い",
-    amount: "612,400円",
-    status: "確定",
-    tone: "confirmed",
-    statusLabel: "確定",
-    note: "局突合により配達完了２を2件修正済み",
-    noteIsTag: true,
-  },
-  {
-    driver: "田中 誠",
-    area: "宇品",
-    payType: "週払い",
-    amount: "98,600円",
-    status: "未承認",
-    tone: "alert",
-    statusLabel: "差異あり",
-    note: "件数突合待ち",
-  },
-  {
-    driver: "渡辺 陽子",
-    area: "府中",
-    payType: "月払い",
-    amount: "578,000円",
-    status: "確定",
-    tone: "confirmed",
-    statusLabel: "確定",
-    note: "—",
-  },
-];
+const ROWS: Row[] = [];
 
 export default function PaymentPage() {
-  const [checked, setChecked] = useState<Record<string, boolean>>({
-    "佐藤 一郎": true,
-    "鈴木 花子": true,
-  });
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [statusFilter, setStatusFilter] = useState<(typeof STATUS_TABS)[number]>("すべて");
 
   const visibleRows = useMemo(

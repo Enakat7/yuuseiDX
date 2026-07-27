@@ -1,43 +1,17 @@
 import Head from "next/head";
 import OperationLayout from "@/components/OperationLayout";
 
-const DEDUCTIONS = [
-  { label: "控除予定額：大野ガソリン", amount: "▲ 28,000円" },
-  { label: "控除予定額：イチネンガソリン", amount: "▲ 12,000円" },
-  { label: "控除予定額：車両修理費", amount: "▲ 10,000円" },
-  { label: "控除予定額：リース料", amount: "▲ 15,000円" },
-  { label: "控除予定額：前払済み", amount: "▲ 20,000円" },
-];
+const DEDUCTIONS: { label: string; amount: string }[] = [];
 
-const REQUESTS = [
-  {
-    id: "ADV-0231",
-    driver: "佐藤 一郎",
-    date: "2026-07-18",
-    amount: "65,000円",
-    available: "65,000円",
-    tone: "pending",
-    label: "申請中",
-  },
-  {
-    id: "ADV-0230",
-    driver: "鈴木 花子",
-    date: "2026-07-11",
-    amount: "40,000円",
-    available: "38,500円",
-    tone: "alert",
-    label: "超過（要確認）",
-  },
-  {
-    id: "ADV-0229",
-    driver: "高橋 健太",
-    date: "2026-07-04",
-    amount: "30,000円",
-    available: "52,000円",
-    tone: "confirmed",
-    label: "実行済",
-  },
-] as const;
+const REQUESTS: {
+  id: string;
+  driver: string;
+  date: string;
+  amount: string;
+  available: string;
+  tone: string;
+  label: string;
+}[] = [];
 
 export default function AdvancePage() {
   return (
@@ -63,9 +37,10 @@ export default function AdvancePage() {
             <div className="panel__body">
               <div className="field">
                 <label>ドライバー</label>
-                <select defaultValue="佐藤 一郎（西A地区）">
-                  <option>佐藤 一郎（西A地区）</option>
-                  <option>鈴木 花子（安佐南B地区）</option>
+                <select defaultValue="">
+                  <option value="" disabled>
+                    登録済みドライバーがいません
+                  </option>
                 </select>
               </div>
 
@@ -74,7 +49,7 @@ export default function AdvancePage() {
                   <tbody>
                     <tr>
                       <td>ある時点までの本人の売上（自動計算）</td>
-                      <td className="num">150,000円</td>
+                      <td className="num">—</td>
                     </tr>
                     {DEDUCTIONS.map((row) => (
                       <tr key={row.label}>
@@ -92,7 +67,7 @@ export default function AdvancePage() {
                     </tr>
                     <tr className="total">
                       <td>前払可能額</td>
-                      <td className="num">65,000円</td>
+                      <td className="num">—</td>
                     </tr>
                   </tbody>
                 </table>
@@ -111,11 +86,11 @@ export default function AdvancePage() {
               <div className="field-row">
                 <div className="field">
                   <label htmlFor="pay-date">入金日</label>
-                  <input type="date" id="pay-date" defaultValue="2026-07-18" />
+                  <input type="date" id="pay-date" />
                 </div>
                 <div className="field">
                   <label htmlFor="pay-amount">前払金額</label>
-                  <input type="number" id="pay-amount" defaultValue={65000} />
+                  <input type="number" id="pay-amount" />
                 </div>
               </div>
               <div className="field">
@@ -146,6 +121,13 @@ export default function AdvancePage() {
                 </tr>
               </thead>
               <tbody>
+                {REQUESTS.length === 0 && (
+                  <tr>
+                    <td colSpan={7}>
+                      <p className="empty-note">前払依頼はまだありません。</p>
+                    </td>
+                  </tr>
+                )}
                 {REQUESTS.map((row) => (
                   <tr key={row.id}>
                     <td>{row.id}</td>

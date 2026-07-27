@@ -21,13 +21,7 @@ type Row = {
   items: [number, number, number, number, number, number, number];
 };
 
-const ROWS: Row[] = [
-  { driver: "佐藤 一郎", area: "西", items: [28000, 12000, 10000, 15000, 0, 0, 0] },
-  { driver: "鈴木 花子", area: "安佐南", items: [0, 18500, 0, 12000, 8000, 0, 0] },
-  { driver: "高橋 健太", area: "中央(中区)", items: [22000, 0, 15500, 0, 0, 14500, 0] },
-  { driver: "田中 誠", area: "宇品", items: [19000, 0, 0, 10000, 0, 0, 6000] },
-  { driver: "渡辺 陽子", area: "府中", items: [24000, 9000, 0, 0, 13000, 0, 0] },
-];
+const ROWS: Row[] = [];
 
 const COLUMNS = [
   "大野ガソリン",

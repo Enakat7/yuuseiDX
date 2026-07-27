@@ -2,23 +2,9 @@ import Head from "next/head";
 import Link from "next/link";
 import OperationLayout from "@/components/OperationLayout";
 
-const AREA_STATS = [
-  { area: "西", drivers: 21, count: "2,980" },
-  { area: "安佐南", drivers: 18, count: "2,410" },
-  { area: "中央(中区)", drivers: 16, count: "2,105" },
-  { area: "中央(東区)", drivers: 14, count: "1,890" },
-  { area: "府中", drivers: 15, count: "2,020" },
-  { area: "伴", drivers: 12, count: "1,560" },
-  { area: "宇品", drivers: 17, count: "2,340" },
-  { area: "その他", drivers: 15, count: "3,115" },
-];
+const AREA_STATS: { area: string; drivers: number; count: string }[] = [];
 
-const TASKS = [
-  { label: "支払通知書の一括承認（週払い）", pill: "未承認 32件", tone: "pending" },
-  { label: "局・NC 件数突合（木・金）", pill: "仮確定", tone: "provisional" },
-  { label: "前払依頼書の確認", pill: "申請中 7件", tone: "pending" },
-  { label: "免許証 期限切れ間近（3名）", pill: "要確認", tone: "alert" },
-] as const;
+const TASKS: { label: string; pill: string; tone: string }[] = [];
 
 export default function OperationDashboardPage() {
   return (
@@ -41,30 +27,26 @@ export default function OperationDashboardPage() {
           <div className="stat-card">
             <div className="stat-card__label">稼働ドライバー数</div>
             <div className="stat-card__value">
-              128<small>名</small>
+              —<small>名</small>
             </div>
-            <div className="stat-card__delta up">前月比 +4名</div>
           </div>
           <div className="stat-card">
             <div className="stat-card__label">今月の稼働件数</div>
             <div className="stat-card__value">
-              18,420<small>件</small>
+              —<small>件</small>
             </div>
-            <div className="stat-card__delta up">前月比 +6.2%</div>
           </div>
           <div className="stat-card">
             <div className="stat-card__label">支払通知書 未承認</div>
             <div className="stat-card__value">
-              32<small>件</small>
+              —<small>件</small>
             </div>
-            <div className="stat-card__delta flat">要対応</div>
           </div>
           <div className="stat-card">
             <div className="stat-card__label">前払依頼</div>
             <div className="stat-card__value">
-              7<small>件</small>
+              —<small>件</small>
             </div>
-            <div className="stat-card__delta flat">申請中</div>
           </div>
         </div>
 
@@ -86,6 +68,13 @@ export default function OperationDashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {AREA_STATS.length === 0 && (
+                    <tr>
+                      <td colSpan={3}>
+                        <p className="empty-note">稼働状況データはありません。</p>
+                      </td>
+                    </tr>
+                  )}
                   {AREA_STATS.map((row) => (
                     <tr key={row.area}>
                       <td>{row.area}</td>
@@ -103,14 +92,18 @@ export default function OperationDashboardPage() {
               <h3>要対応タスク</h3>
             </div>
             <div className="panel__body">
-              <ul style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                {TASKS.map((task) => (
-                  <li className="flex--between" key={task.label}>
-                    <span>{task.label}</span>
-                    <span className={`pill pill--${task.tone}`}>{task.pill}</span>
-                  </li>
-                ))}
-              </ul>
+              {TASKS.length === 0 ? (
+                <p className="empty-note">要対応のタスクはありません。</p>
+              ) : (
+                <ul style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                  {TASKS.map((task) => (
+                    <li className="flex--between" key={task.label}>
+                      <span>{task.label}</span>
+                      <span className={`pill pill--${task.tone}`}>{task.pill}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
         </div>

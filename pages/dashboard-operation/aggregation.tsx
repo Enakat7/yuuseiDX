@@ -21,13 +21,7 @@ type Row = {
   counts: [number, number, number, number, number, number, number, number];
 };
 
-const ROWS: Row[] = [
-  { driver: "佐藤 一郎", area: "西", counts: [142, 38, 4, 1, 0, 2, 18, 6] },
-  { driver: "鈴木 花子", area: "安佐南", counts: [118, 29, 2, 0, 1, 0, 15, 4] },
-  { driver: "高橋 健太", area: "中央(中区)", counts: [156, 41, 6, 2, 0, 3, 22, 8] },
-  { driver: "田中 誠", area: "宇品", counts: [99, 22, 1, 0, 0, 1, 12, 3] },
-  { driver: "渡辺 陽子", area: "府中", counts: [131, 35, 3, 1, 2, 1, 19, 5] },
-];
+const ROWS: Row[] = [];
 
 const COLUMNS = [
   "配達完了１",
@@ -43,10 +37,7 @@ const COLUMNS = [
 export default function AggregationPage() {
   const [area, setArea] = useState<(typeof AREAS)[number]>("全エリア");
   const [date, setDate] = useState(() => new Date(2026, 6, 17));
-  const [checked, setChecked] = useState<Record<string, boolean>>({
-    "佐藤 一郎": true,
-    "鈴木 花子": true,
-  });
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [rows, setRows] = useState<Row[]>(ROWS);
   const [editMode, setEditMode] = useState(false);
 

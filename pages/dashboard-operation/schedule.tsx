@@ -29,57 +29,7 @@ type Driver = {
   confirmed: boolean;
 };
 
-const WEST_DRIVERS: Driver[] = [
-  {
-    id: "sato",
-    name: "佐藤 一郎",
-    district: "西A地区",
-    week: [true, true, true, true, true, false, false],
-    status: "confirmed",
-    statusLabel: "送信済",
-    confirmed: true,
-  },
-  {
-    id: "suzuki",
-    name: "鈴木 花子",
-    district: "西B地区",
-    week: [false, true, false, true, true, true, false],
-    status: "confirmed",
-    statusLabel: "送信済",
-    confirmed: true,
-  },
-  {
-    id: "takahashi",
-    name: "高橋 健太",
-    district: "西A地区",
-    week: [true, true, true, true, false, false, false],
-    status: "provisional",
-    statusLabel: "未送信",
-    confirmed: false,
-  },
-  {
-    id: "tanaka",
-    name: "田中 誠",
-    district: "西C地区",
-    week: [true, false, true, true, true, true, false],
-    status: "confirmed",
-    statusLabel: "送信済",
-    confirmed: true,
-  },
-  {
-    id: "watanabe",
-    name: "渡辺 陽子",
-    district: "西B地区",
-    week: [true, true, true, false, true, false, true],
-    status: "alert",
-    statusLabel: "要再送信",
-    confirmed: false,
-  },
-];
-
-const DRIVERS_BY_AREA: Partial<Record<(typeof AREAS)[number], Driver[]>> = {
-  西: WEST_DRIVERS,
-};
+const DRIVERS_BY_AREA: Partial<Record<(typeof AREAS)[number], Driver[]>> = {};
 
 // 2026年7月1日は水曜日（Mon=0 起点で firstWeekday=2）
 const JULY_2026_FIRST_WEEKDAY = 2;
@@ -88,9 +38,7 @@ const JULY_2026_DAYS = 31;
 export default function SchedulePage() {
   const [area, setArea] = useState<(typeof AREAS)[number]>("西");
   const [openDriver, setOpenDriver] = useState<Driver | null>(null);
-  const [confirmedMap, setConfirmedMap] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(WEST_DRIVERS.map((driver) => [driver.id, driver.confirmed]))
-  );
+  const [confirmedMap, setConfirmedMap] = useState<Record<string, boolean>>({});
 
   const drivers = DRIVERS_BY_AREA[area] ?? [];
 

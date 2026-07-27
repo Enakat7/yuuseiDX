@@ -6,25 +6,17 @@ const AREAS = ["広島西", "安佐南", "中央(中区)", "中央(東区)", "�
 
 const ITEMS = ["配達完了１", "転居大口１", "夜間配送", "大配送", "集荷１", "集荷２"];
 
-const RECEIVING_PRICES: number[][] = [
-  [180, 175, 190, 195, 185, 170, 200],
-  [420, 410, 430, 440, 425, 400, 450],
-  [350, 340, 360, 365, 355, 330, 370],
-  [600, 580, 620, 630, 610, 570, 650],
-  [150, 145, 155, 160, 150, 140, 165],
-  [130, 125, 135, 140, 130, 120, 145],
-];
+const EMPTY_PRICES: (number | null)[][] = ITEMS.map(() => AREAS.map(() => null));
 
-const PAYOUT_PRICES: number[][] = [
-  [140, 135, 148, 152, 144, 132, 155],
-  [330, 320, 335, 345, 332, 312, 352],
-  [270, 262, 278, 282, 274, 255, 286],
-  [470, 455, 485, 492, 478, 447, 508],
-  [115, 111, 119, 123, 115, 107, 127],
-  [100, 96, 104, 108, 100, 92, 112],
-];
-
-function PriceGrid({ title, note, prices }: { title: string; note: string; prices: number[][] }) {
+function PriceGrid({
+  title,
+  note,
+  prices,
+}: {
+  title: string;
+  note: string;
+  prices: (number | null)[][];
+}) {
   return (
     <div className="panel">
       <div className="panel__head">
@@ -49,7 +41,12 @@ function PriceGrid({ title, note, prices }: { title: string; note: string; price
                 <td className="item">{item}</td>
                 {prices[rowIndex].map((value, colIndex) => (
                   <td className="cell" key={colIndex}>
-                    <input className="price-input" type="number" defaultValue={value} />
+                    <input
+                      className="price-input"
+                      type="number"
+                      defaultValue={value ?? undefined}
+                      placeholder="未設定"
+                    />
                   </td>
                 ))}
               </tr>
@@ -85,8 +82,8 @@ export default function MasterPricePage() {
 
         <MasterTabs />
 
-        <PriceGrid title="受単価マスタ" note="局・NCからの受注単価（円 / 件）" prices={RECEIVING_PRICES} />
-        <PriceGrid title="卸単価マスタ" note="ドライバーへの支払単価（円 / 件）" prices={PAYOUT_PRICES} />
+        <PriceGrid title="受単価マスタ" note="局・NCからの受注単価（円 / 件）" prices={EMPTY_PRICES} />
+        <PriceGrid title="卸単価マスタ" note="ドライバーへの支払単価（円 / 件）" prices={EMPTY_PRICES} />
 
         <div className="flex" style={{ justifyContent: "flex-end", marginTop: 20 }}>
           <button className="btn btn--ghost">変更を破棄</button>

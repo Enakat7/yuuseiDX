@@ -9,7 +9,7 @@ export type CurrentUser = {
 
 const STORAGE_KEY = "you-say:current-user";
 
-export const DEFAULT_USER: CurrentUser = { name: "山田 太郎", role: "管理者" };
+export const DEFAULT_USER: CurrentUser = { name: "", role: "スタッフ" };
 
 type CurrentUserContextValue = {
   user: CurrentUser;
