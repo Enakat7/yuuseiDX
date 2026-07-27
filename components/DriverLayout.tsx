@@ -2,6 +2,11 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 import type { ReactNode } from "react";
 
+async function handleLogout() {
+  await fetch("/api/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+}
+
 const TABS = [
   { label: "ホーム", href: "/dashboard-driver" },
   { label: "発注書", href: "/dashboard-driver/order" },
@@ -17,9 +22,21 @@ export default function DriverLayout({ children }: { children: ReactNode }) {
         <div className="logo">
           YOU SAY<span>!!</span>
         </div>
-        <Link href="/login" style={{ color: "#fff", textDecoration: "none", fontSize: 12 }}>
+        <button
+          type="button"
+          onClick={handleLogout}
+          style={{
+            color: "#fff",
+            background: "transparent",
+            border: "none",
+            padding: 0,
+            font: "inherit",
+            fontSize: 12,
+            cursor: "pointer",
+          }}
+        >
           ログアウト
-        </Link>
+        </button>
       </header>
 
       <nav className="driver-tabs">

@@ -1,7 +1,12 @@
-import Link from "next/link";
 import { useRouter } from "next/router";
 import type { ReactNode } from "react";
 import { useCurrentUser } from "@/lib/currentUser";
+import Link from "next/link";
+
+async function handleLogout() {
+  await fetch("/api/auth/logout", { method: "POST" });
+  window.location.href = "/login";
+}
 
 const NAV_ITEMS = [
   { label: "ダッシュボード", href: "/dashboard-operation" },
@@ -58,8 +63,9 @@ export default function OperationLayout({ children }: { children: ReactNode }) {
               <div className="user-chip__name">{user.name}</div>
               <div className="user-chip__role">{user.role}</div>
             </div>
-            <Link
-              href="/login"
+            <button
+              type="button"
+              onClick={handleLogout}
               className="user-chip__logout"
               title="ログアウト"
               aria-label="ログアウト"
@@ -78,7 +84,7 @@ export default function OperationLayout({ children }: { children: ReactNode }) {
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
               </svg>
-            </Link>
+            </button>
           </div>
         </div>
       </aside>

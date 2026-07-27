@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type OperationRole = "管理者" | "スタッフ";
+export type OperationRole = "管理者" | "スタッフ" | "ドライバー";
 
 export type CurrentUser = {
   name: string;
@@ -10,15 +10,6 @@ export type CurrentUser = {
 const STORAGE_KEY = "you-say:current-user";
 
 export const DEFAULT_USER: CurrentUser = { name: "山田 太郎", role: "管理者" };
-
-const USERS_BY_ROLE: Record<OperationRole, CurrentUser> = {
-  管理者: { name: "山田 太郎", role: "管理者" },
-  スタッフ: { name: "中村 恵", role: "スタッフ" },
-};
-
-export function userForRole(role: OperationRole): CurrentUser {
-  return USERS_BY_ROLE[role];
-}
 
 type CurrentUserContextValue = {
   user: CurrentUser;
@@ -35,7 +26,7 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
     if (!raw) return;
     try {
       const parsed = JSON.parse(raw) as CurrentUser;
-      if (parsed.role === "管理者" || parsed.role === "スタッフ") {
+      if (parsed.role === "管理者" || parsed.role === "スタッフ" || parsed.role === "ドライバー") {
         // サーバーとクライアント初回描画を一致させるため、localStorage の反映は
         // マウント後の effect で行う（SSR ハイドレーション崩れを防ぐための意図的な設計）。
         // eslint-disable-next-line react-hooks/set-state-in-effect

@@ -229,10 +229,14 @@ img {
   height: 28px;
   flex-shrink: 0;
   margin-left: auto;
+  border: none;
   border-left: var(--border-w-sm) solid var(--black);
   padding-left: 8px;
+  background: transparent;
   color: var(--black);
   text-decoration: none;
+  cursor: pointer;
+  font: inherit;
 }
 
 .user-chip__logout:hover {
@@ -649,6 +653,7 @@ td.num, th.num {
 }
 
 input[type="text"],
+input[type="email"],
 input[type="password"],
 input[type="date"],
 input[type="number"],
