@@ -1,10 +1,9 @@
 import Head from "next/head";
 import OperationLayout from "@/components/OperationLayout";
 import MasterTabs from "@/components/MasterTabs";
+import { AREAS } from "@/lib/constants";
 
-const AREAS = ["広島西", "安佐南", "中央(中区)", "中央(東区)", "府中", "伴", "宇品"];
-
-const ITEMS = ["配達完了１", "転居大口１", "夜間配送", "大配送", "集荷１", "集荷２"];
+const ITEMS = ["配達完了１", "転居大口等１", "夜間配送", "大配送", "集荷１", "集荷２"];
 
 const EMPTY_PRICES: (number | null)[][] = ITEMS.map(() => AREAS.map(() => null));
 

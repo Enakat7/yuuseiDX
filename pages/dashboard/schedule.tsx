@@ -3,17 +3,7 @@ import { useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import Modal from "@/components/Modal";
 import { buildMonthGrid, DOW_LABELS } from "@/lib/calendar";
-
-const AREAS = [
-  "西",
-  "安佐南",
-  "中央(中区)",
-  "中央(東区)",
-  "府中",
-  "伴",
-  "宇品",
-  "その他",
-] as const;
+import { AREA_TABS } from "@/lib/constants";
 
 const WEEK_DATES = ["7/13(月)", "7/14(火)", "7/15(水)", "7/16(木)", "7/17(金)", "7/18(土)", "7/19(日)"];
 
@@ -29,14 +19,14 @@ type Driver = {
   confirmed: boolean;
 };
 
-const DRIVERS_BY_AREA: Partial<Record<(typeof AREAS)[number], Driver[]>> = {};
+const DRIVERS_BY_AREA: Partial<Record<(typeof AREA_TABS)[number], Driver[]>> = {};
 
 // 2026年7月1日は水曜日（Mon=0 起点で firstWeekday=2）
 const JULY_2026_FIRST_WEEKDAY = 2;
 const JULY_2026_DAYS = 31;
 
 export default function SchedulePage() {
-  const [area, setArea] = useState<(typeof AREAS)[number]>("西");
+  const [area, setArea] = useState<(typeof AREA_TABS)[number]>("西");
   const [openDriver, setOpenDriver] = useState<Driver | null>(null);
   const [confirmedMap, setConfirmedMap] = useState<Record<string, boolean>>({});
 
@@ -74,7 +64,7 @@ export default function SchedulePage() {
         </div>
 
         <div className="tabbar" style={{ marginBottom: 22 }}>
-          {AREAS.map((a) => (
+          {AREA_TABS.map((a) => (
             <a
               key={a}
               href="#"

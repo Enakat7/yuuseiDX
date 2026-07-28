@@ -1,19 +1,7 @@
 import Head from "next/head";
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
-
-const AREAS = [
-  "全エリア",
-  "西",
-  "安佐南",
-  "中央(中区)",
-  "中央(東区)",
-  "府中",
-  "伴",
-  "宇品",
-  "その他",
-] as const;
+import { AREA_FILTER_TABS } from "@/lib/constants";
 
 type Row = {
   driver: string;
@@ -38,7 +26,7 @@ function formatYen(value: number) {
 }
 
 export default function CostPage() {
-  const [area, setArea] = useState<(typeof AREAS)[number]>("全エリア");
+  const [area, setArea] = useState<(typeof AREA_FILTER_TABS)[number]>("全エリア");
 
   const visibleRows = useMemo(
     () => (area === "全エリア" ? ROWS : ROWS.filter((row) => row.area === area)),
@@ -69,7 +57,7 @@ export default function CostPage() {
         </div>
 
         <div className="tabbar" style={{ marginBottom: 22 }}>
-          {AREAS.map((a) => (
+          {AREA_FILTER_TABS.map((a) => (
             <a
               key={a}
               href="#"
