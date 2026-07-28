@@ -40,7 +40,7 @@ export default function LoginPage() {
       }
 
       setUser({ name: body.name, role: body.role });
-      router.push(body.role === "ドライバー" ? "/dashboard-driver" : "/dashboard-operation");
+      router.push(body.role === "ドライバー" ? "/mypage" : "/dashboard");
     } catch {
       setError("通信エラーが発生しました。時間をおいて再度お試しください。");
       setPassword("");

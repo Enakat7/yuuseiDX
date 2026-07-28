@@ -2,8 +2,8 @@ import Link from "next/link";
 import { useRouter } from "next/router";
 
 const TABS = [
-  { label: "ドライバー", href: "/dashboard-operation/master" },
-  { label: "単価", href: "/dashboard-operation/master/price" },
+  { label: "ドライバー", href: "/dashboard/master" },
+  { label: "単価", href: "/dashboard/master/price" },
 ];
 
 export default function MasterTabs() {

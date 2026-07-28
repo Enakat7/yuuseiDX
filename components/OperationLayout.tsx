@@ -9,20 +9,20 @@ async function handleLogout() {
 }
 
 const NAV_ITEMS = [
-  { label: "ダッシュボード", href: "/dashboard-operation" },
-  { label: "件数集計", href: "/dashboard-operation/aggregation" },
-  { label: "管理費集計", href: "/dashboard-operation/cost" },
-  { label: "発注書(稼働表)", href: "/dashboard-operation/schedule" },
-  { label: "支払通知書", href: "/dashboard-operation/payment" },
-  { label: "前払依頼書", href: "/dashboard-operation/advance" },
-  { label: "マスタ管理", href: "/dashboard-operation/master" },
-  { label: "設定", href: "/dashboard-operation/settings" },
+  { label: "ダッシュボード", href: "/dashboard" },
+  { label: "件数集計", href: "/dashboard/aggregation" },
+  { label: "管理費集計", href: "/dashboard/cost" },
+  { label: "発注書(稼働表)", href: "/dashboard/schedule" },
+  { label: "支払通知書", href: "/dashboard/payment" },
+  { label: "前払依頼書", href: "/dashboard/advance" },
+  { label: "マスタ管理", href: "/dashboard/master" },
+  { label: "設定", href: "/dashboard/settings" },
 ];
 
-const ADMIN_ONLY_ITEM = { label: "ログ", href: "/dashboard-operation/log" };
+const ADMIN_ONLY_ITEM = { label: "ログ", href: "/dashboard/log" };
 
 function isActive(pathname: string, href: string) {
-  if (href === "/dashboard-operation") return pathname === href;
+  if (href === "/dashboard") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

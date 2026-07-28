@@ -8,9 +8,9 @@ async function handleLogout() {
 }
 
 const TABS = [
-  { label: "ホーム", href: "/dashboard-driver" },
-  { label: "発注書", href: "/dashboard-driver/order" },
-  { label: "支払通知書", href: "/dashboard-driver/payment" },
+  { label: "ホーム", href: "/mypage" },
+  { label: "発注書", href: "/mypage/order" },
+  { label: "支払通知書", href: "/mypage/payment" },
 ];
 
 export default function DriverLayout({ children }: { children: ReactNode }) {

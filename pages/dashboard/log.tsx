@@ -30,7 +30,7 @@ export default function OperationLogPage() {
 
   useEffect(() => {
     if (user.role !== "管理者") {
-      router.replace("/dashboard-operation");
+      router.replace("/dashboard");
     }
   }, [user.role, router]);
 

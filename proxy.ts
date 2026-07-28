@@ -31,8 +31,8 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const pathname = request.nextUrl.pathname;
-  const isOperationRoute = pathname.startsWith("/dashboard-operation");
-  const isDriverRoute = pathname.startsWith("/dashboard-driver");
+  const isOperationRoute = pathname.startsWith("/dashboard");
+  const isDriverRoute = pathname.startsWith("/mypage");
 
   if (!user) {
     if (isOperationRoute || isDriverRoute) {
@@ -55,10 +55,10 @@ export async function proxy(request: NextRequest) {
 
     // ロールに応じたダッシュボードへのアクセス制御(認可の徹底。要件9.2)
     if (isOperationRoute && role === "ドライバー") {
-      return NextResponse.redirect(new URL("/dashboard-driver", request.url));
+      return NextResponse.redirect(new URL("/mypage", request.url));
     }
     if (isDriverRoute && role !== "ドライバー") {
-      return NextResponse.redirect(new URL("/dashboard-operation", request.url));
+      return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
@@ -66,5 +66,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard-operation/:path*", "/dashboard-driver/:path*"],
+  matcher: ["/dashboard/:path*", "/mypage/:path*"],
 };

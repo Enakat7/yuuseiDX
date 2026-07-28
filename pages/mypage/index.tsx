@@ -62,14 +62,14 @@ export default function DriverDashboardPage() {
 
         <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", marginTop: 20 }}>
           <Link
-            href="/dashboard-driver/order"
+            href="/mypage/order"
             className="panel"
             style={{ textDecoration: "none", color: "inherit", display: "block", padding: 22, textAlign: "center" }}
           >
             <div style={{ fontWeight: 900, fontSize: 15 }}>発注書</div>
           </Link>
           <Link
-            href="/dashboard-driver/payment"
+            href="/mypage/payment"
             className="panel"
             style={{ textDecoration: "none", color: "inherit", display: "block", padding: 22, textAlign: "center" }}
           >
