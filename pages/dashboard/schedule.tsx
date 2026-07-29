@@ -1,45 +1,147 @@
 import Head from "next/head";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import Modal from "@/components/Modal";
-import { buildMonthGrid, DOW_LABELS } from "@/lib/calendar";
+import { buildMonthGridFromDates, DOW_LABELS } from "@/lib/calendar";
 import { AREA_TABS } from "@/lib/constants";
+import { apiRequest } from "@/lib/apiClient";
+import { addDays, getWeekDates, getWeekRange, toIsoDate } from "@/lib/date";
+import type { ScheduleRow } from "@/types/domain/schedule";
 
-const WEEK_DATES = ["7/13(月)", "7/14(火)", "7/15(水)", "7/16(木)", "7/17(金)", "7/18(土)", "7/19(日)"];
-
-type Status = "confirmed" | "provisional" | "alert";
-
-type Driver = {
-  id: string;
-  name: string;
-  district: string;
-  week: boolean[]; // Mon..Sun
-  status: Status;
-  statusLabel: string;
-  confirmed: boolean;
+const STATUS_LABEL: Record<string, string> = {
+  未送信: "未送信",
+  送信済: "送信済",
+  要再送信: "要再送信",
+};
+const STATUS_TONE: Record<string, string> = {
+  未送信: "pending",
+  送信済: "confirmed",
+  要再送信: "alert",
 };
 
-const DRIVERS_BY_AREA: Partial<Record<(typeof AREA_TABS)[number], Driver[]>> = {};
-
-// 2026年7月1日は水曜日（Mon=0 起点で firstWeekday=2）
-const JULY_2026_FIRST_WEEKDAY = 2;
-const JULY_2026_DAYS = 31;
+function nextMonthRange(): { start: string; end: string } {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
+  return { start: toIsoDate(start), end: toIsoDate(end) };
+}
 
 export default function SchedulePage() {
   const [area, setArea] = useState<(typeof AREA_TABS)[number]>("西");
-  const [openDriver, setOpenDriver] = useState<Driver | null>(null);
-  const [confirmedMap, setConfirmedMap] = useState<Record<string, boolean>>({});
+  const [weekStart, setWeekStart] = useState(() => new Date(getWeekRange(new Date()).start));
+  const [rows, setRows] = useState<ScheduleRow[]>([]);
+  const [weekDates, setWeekDates] = useState(() => getWeekDates(weekStart));
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const drivers = DRIVERS_BY_AREA[area] ?? [];
+  const defaultPeriod = useMemo(() => nextMonthRange(), []);
+  const [periodStart, setPeriodStart] = useState(defaultPeriod.start);
+  const [periodEnd, setPeriodEnd] = useState(defaultPeriod.end);
 
-  const toggleConfirmed = (id: string) => {
-    setConfirmedMap((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
+  const [openDriverId, setOpenDriverId] = useState<string | null>(null);
+  const [monthWorkedDates, setMonthWorkedDates] = useState<Set<string>>(new Set());
 
+  async function loadAll() {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({
+        area,
+        week_start: toIsoDate(weekStart),
+        period_start: periodStart,
+        period_end: periodEnd,
+      });
+      const res = await apiRequest<{ data: ScheduleRow[]; weekDates: { iso: string; label: string }[] }>(
+        `/api/schedule?${params.toString()}`
+      );
+      setRows(res.data);
+      setWeekDates(res.weekDates);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "取得に失敗しました。");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // エリア/週/対象期間切替時にAPI経由で再取得する意図的な副作用のため無効化する
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [area, weekStart, periodStart, periodEnd]);
+
+  async function toggleDay(driverId: string, dayIndex: number) {
+    const row = rows.find((r) => r.driverId === driverId);
+    if (!row) return;
+    const nextWorked = !row.week[dayIndex];
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest("/api/schedule/days", {
+        method: "POST",
+        body: JSON.stringify({ driver_id: driverId, work_date: weekDates[dayIndex].iso, worked: nextWorked }),
+      });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "更新に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleIssueAll() {
+    const driverIds = rows.filter((r) => !r.orderStatus).map((r) => r.driverId);
+    if (driverIds.length === 0) {
+      setError("対象期間の発注書が未発行のドライバーはいません。");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest("/api/schedule/issue", {
+        method: "POST",
+        body: JSON.stringify({ driver_ids: driverIds, period_start: periodStart, period_end: periodEnd }),
+      });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "発行に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleReissue(orderId: string) {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest("/api/schedule/reissue", { method: "POST", body: JSON.stringify({ order_id: orderId }) });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "再発行に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function openDetail(driverId: string) {
+    setOpenDriverId(driverId);
+    const d = weekStart;
+    try {
+      const res = await apiRequest<{ workedDates: string[] }>(
+        `/api/schedule/month?driver_id=${driverId}&year=${d.getFullYear()}&month=${d.getMonth() + 1}`
+      );
+      setMonthWorkedDates(new Set(res.workedDates));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "取得に失敗しました。");
+    }
+  }
+
+  const openDriver = rows.find((r) => r.driverId === openDriverId) ?? null;
   const monthGrid = useMemo(() => {
     if (!openDriver) return null;
-    return buildMonthGrid(JULY_2026_DAYS, JULY_2026_FIRST_WEEKDAY, openDriver.week);
-  }, [openDriver]);
+    return buildMonthGridFromDates(weekStart.getFullYear(), weekStart.getMonth() + 1, monthWorkedDates);
+  }, [openDriver, monthWorkedDates, weekStart]);
 
   return (
     <>
@@ -52,14 +154,37 @@ export default function SchedulePage() {
             <h2>エリア別 稼働表</h2>
             <p className="content__lead">エリアタブを切り替えて、ドライバーごとの稼働状況を確認します。</p>
           </div>
-          <div className="flex">
-            <select style={{ width: "auto" }} defaultValue="2026年7月">
-              <option>2026年7月</option>
-              <option>2026年6月</option>
-            </select>
-            <button className="btn btn--ghost">CSVインポート</button>
-            <button className="btn btn--ghost">CSVエクスポート</button>
-            <button className="btn btn--ghost">発注書を一括送信</button>
+        </div>
+
+        {error && (
+          <p className="text-sm" style={{ color: "var(--black)", marginBottom: 12 }}>
+            {error}
+          </p>
+        )}
+
+        <div className="panel" style={{ marginBottom: 22 }}>
+          <div className="panel__head">
+            <h3>発注書の対象期間・発行</h3>
+          </div>
+          <div className="panel__body">
+            <div className="field-row">
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="period-start">対象期間開始</label>
+                <input id="period-start" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
+              </div>
+              <div className="field" style={{ marginBottom: 0 }}>
+                <label htmlFor="period-end">対象期間終了</label>
+                <input id="period-end" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
+              </div>
+              <div className="field" style={{ marginBottom: 0, alignSelf: "end" }}>
+                <button type="button" className="btn btn--ghost" onClick={handleIssueAll} disabled={saving}>
+                  未発行分を一括発行
+                </button>
+              </div>
+            </div>
+            <p className="text-sm text-muted" style={{ marginTop: 8 }}>
+              発注書は自動発行ではなく手動で発行します（デフォルトは翌月分）。稼働内容の変更後は自動的に「要再送信」になります。
+            </p>
           </div>
         </div>
 
@@ -82,51 +207,87 @@ export default function SchedulePage() {
         <div className="panel">
           <div className="panel__head">
             <h3>{area}エリア — 稼働表</h3>
-            <span className="text-sm text-muted">{drivers.length}名 稼働中</span>
+            <div className="flex" style={{ gap: 12, alignItems: "center" }}>
+              <span className="text-sm text-muted">{rows.length}名 稼働中</span>
+              <div className="date-nav">
+                <button
+                  type="button"
+                  className="date-nav__btn"
+                  aria-label="前週"
+                  onClick={() => setWeekStart((d) => addDays(d, -7))}
+                >
+                  ‹
+                </button>
+                <span className="date-nav__value">
+                  {weekDates[0]?.label}〜{weekDates[6]?.label}
+                </span>
+                <button
+                  type="button"
+                  className="date-nav__btn"
+                  aria-label="翌週"
+                  onClick={() => setWeekStart((d) => addDays(d, 7))}
+                >
+                  ›
+                </button>
+              </div>
+            </div>
           </div>
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>ドライバー</th>
-                  {WEEK_DATES.map((d) => (
-                    <th key={d}>{d}</th>
+                  {weekDates.map((d) => (
+                    <th key={d.iso}>{d.label}</th>
                   ))}
                   <th>発注書状況</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {drivers.length === 0 && (
+                {!loading && rows.length === 0 && (
                   <tr>
                     <td colSpan={10}>
                       <p className="empty-note">このエリアの稼働表データはまだありません。</p>
                     </td>
                   </tr>
                 )}
-                {drivers.map((driver) => {
-                  const isConfirmed = !!confirmedMap[driver.id];
+                {rows.map((driver) => {
+                  const status = driver.orderStatus ?? "未送信";
                   return (
-                    <tr key={driver.id}>
-                      <td>{driver.name}</td>
+                    <tr key={driver.driverId}>
+                      <td>{driver.driverName}</td>
                       {driver.week.map((worked, index) => (
-                        <td key={index}>{worked ? "◯" : "-"}</td>
+                        <td key={index}>
+                          <button
+                            type="button"
+                            className="btn btn--sm btn--ghost"
+                            style={{ padding: "4px 10px" }}
+                            onClick={() => toggleDay(driver.driverId, index)}
+                            disabled={saving}
+                          >
+                            {worked ? "◯" : "-"}
+                          </button>
+                        </td>
                       ))}
                       <td>
-                        <span className={`pill pill--${driver.status}`}>{driver.statusLabel}</span>
+                        <span className={`pill pill--${STATUS_TONE[status]}`}>{STATUS_LABEL[status]}</span>
                       </td>
                       <td>
                         <div className="flex" style={{ gap: 8 }}>
-                          <button type="button" className="btn btn--sm" onClick={() => setOpenDriver(driver)}>
+                          <button type="button" className="btn btn--sm" onClick={() => openDetail(driver.driverId)}>
                             詳細
                           </button>
-                          <button
-                            type="button"
-                            className={`btn btn--sm${isConfirmed ? "" : " btn--ghost"}`}
-                            onClick={() => toggleConfirmed(driver.id)}
-                          >
-                            {isConfirmed ? "確定" : "未確定"}
-                          </button>
+                          {driver.orderStatus === "要再送信" && driver.orderId && (
+                            <button
+                              type="button"
+                              className="btn btn--sm"
+                              onClick={() => handleReissue(driver.orderId as string)}
+                              disabled={saving}
+                            >
+                              再発行
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -140,9 +301,11 @@ export default function SchedulePage() {
 
       {openDriver && monthGrid && (
         <Modal
-          title={`${openDriver.name} — 稼働カレンダー`}
-          subtitle={`${area}エリア / ${openDriver.district} ／ 2026年7月`}
-          onClose={() => setOpenDriver(null)}
+          title={`${openDriver.driverName} — 稼働カレンダー`}
+          subtitle={`${area}エリア${
+            openDriver.districtNames.length > 0 ? ` / ${openDriver.districtNames.join("・")}` : ""
+          } ／ ${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月`}
+          onClose={() => setOpenDriverId(null)}
         >
           <div className="month-cal__stats">
             <div>
@@ -155,7 +318,7 @@ export default function SchedulePage() {
             <div>
               <div className="month-cal__stat-label">休み</div>
               <div className="month-cal__stat-value">
-                {JULY_2026_DAYS - monthGrid.workCount}
+                {monthGrid.daysInMonth - monthGrid.workCount}
                 <small style={{ fontSize: 12, fontWeight: 700, marginLeft: 2 }}>日</small>
               </div>
             </div>

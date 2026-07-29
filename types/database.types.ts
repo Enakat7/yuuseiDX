@@ -885,6 +885,89 @@ export type Database = {
         }
         Relationships: []
       }
+      purchase_orders: {
+        Row: {
+          area_id: string | null
+          created_at: string
+          district_id: string | null
+          driver_id: string
+          id: string
+          issued_at: string | null
+          issued_by: string | null
+          order_no: string
+          pdf_storage_path: string | null
+          period_end: string
+          period_start: string
+          reissue_count: number
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          area_id?: string | null
+          created_at?: string
+          district_id?: string | null
+          driver_id: string
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          order_no: string
+          pdf_storage_path?: string | null
+          period_end: string
+          period_start: string
+          reissue_count?: number
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          area_id?: string | null
+          created_at?: string
+          district_id?: string | null
+          driver_id?: string
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          order_no?: string
+          pdf_storage_path?: string | null
+          period_end?: string
+          period_start?: string
+          reissue_count?: number
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_orders_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_district_id_fkey"
+            columns: ["district_id"]
+            isOneToOne: false
+            referencedRelation: "districts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchase_orders_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       unit_prices: {
         Row: {
           area_id: string
@@ -936,6 +1019,51 @@ export type Database = {
             columns: ["delivery_type_id"]
             isOneToOne: false
             referencedRelation: "delivery_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_schedule_days: {
+        Row: {
+          created_at: string
+          driver_id: string
+          id: string
+          updated_at: string
+          updated_by: string | null
+          work_date: string
+          worked: boolean
+        }
+        Insert: {
+          created_at?: string
+          driver_id: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_date: string
+          worked?: boolean
+        }
+        Update: {
+          created_at?: string
+          driver_id?: string
+          id?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_date?: string
+          worked?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_schedule_days_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_schedule_days_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
