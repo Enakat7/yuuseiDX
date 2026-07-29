@@ -34,6 +34,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      advance_requests: {
+        Row: {
+          amount: number
+          available_amount_snapshot: number
+          created_at: string
+          created_by: string | null
+          driver_id: string
+          id: string
+          note: string | null
+          payout_date: string
+          request_no: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          available_amount_snapshot: number
+          created_at?: string
+          created_by?: string | null
+          driver_id: string
+          id?: string
+          note?: string | null
+          payout_date: string
+          request_no: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          available_amount_snapshot?: number
+          created_at?: string
+          created_by?: string | null
+          driver_id?: string
+          id?: string
+          note?: string | null
+          payout_date?: string
+          request_no?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advance_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advance_requests_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       areas: {
         Row: {
           active: boolean
