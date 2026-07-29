@@ -599,6 +599,211 @@ export type Database = {
           },
         ]
       }
+      payment_notice_email_sends: {
+        Row: {
+          id: string
+          payment_notice_id: string
+          sent_at: string
+          sent_by: string | null
+          sent_to: string
+        }
+        Insert: {
+          id?: string
+          payment_notice_id: string
+          sent_at?: string
+          sent_by?: string | null
+          sent_to: string
+        }
+        Update: {
+          id?: string
+          payment_notice_id?: string
+          sent_at?: string
+          sent_by?: string | null
+          sent_to?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_notice_email_sends_payment_notice_id_fkey"
+            columns: ["payment_notice_id"]
+            isOneToOne: false
+            referencedRelation: "payment_notices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_notice_email_sends_sent_by_fkey"
+            columns: ["sent_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_notice_items: {
+        Row: {
+          amount: number
+          category_id: string
+          count: number
+          id: string
+          payment_notice_id: string
+          unit_price_snapshot: number
+        }
+        Insert: {
+          amount?: number
+          category_id: string
+          count?: number
+          id?: string
+          payment_notice_id: string
+          unit_price_snapshot?: number
+        }
+        Update: {
+          amount?: number
+          category_id?: string
+          count?: number
+          id?: string
+          payment_notice_id?: string
+          unit_price_snapshot?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_notice_items_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "count_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_notice_items_payment_notice_id_fkey"
+            columns: ["payment_notice_id"]
+            isOneToOne: false
+            referencedRelation: "payment_notices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_notice_revisions: {
+        Row: {
+          diff_summary: string | null
+          id: string
+          new_amount: number
+          payment_notice_id: string
+          previous_amount: number
+          revised_at: string
+          revised_by: string | null
+        }
+        Insert: {
+          diff_summary?: string | null
+          id?: string
+          new_amount: number
+          payment_notice_id: string
+          previous_amount: number
+          revised_at?: string
+          revised_by?: string | null
+        }
+        Update: {
+          diff_summary?: string | null
+          id?: string
+          new_amount?: number
+          payment_notice_id?: string
+          previous_amount?: number
+          revised_at?: string
+          revised_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_notice_revisions_payment_notice_id_fkey"
+            columns: ["payment_notice_id"]
+            isOneToOne: false
+            referencedRelation: "payment_notices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_notice_revisions_revised_by_fkey"
+            columns: ["revised_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_notices: {
+        Row: {
+          amount: number
+          area_id: string | null
+          confirmed_at: string | null
+          confirmed_by: string | null
+          created_at: string
+          driver_acknowledged_at: string | null
+          driver_acknowledged_ip: string | null
+          driver_id: string
+          id: string
+          notice_no: string
+          pay_type: string
+          period_end: string
+          period_start: string
+          remarks: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          area_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          driver_acknowledged_at?: string | null
+          driver_acknowledged_ip?: string | null
+          driver_id: string
+          id?: string
+          notice_no: string
+          pay_type: string
+          period_end: string
+          period_start: string
+          remarks?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          area_id?: string | null
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          created_at?: string
+          driver_acknowledged_at?: string | null
+          driver_acknowledged_ip?: string | null
+          driver_id?: string
+          id?: string
+          notice_no?: string
+          pay_type?: string
+          period_end?: string
+          period_start?: string
+          remarks?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_notices_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_notices_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_notices_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -683,7 +888,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acknowledge_payment_notice: {
+        Args: { p_ip?: string; p_notice_id: string }
+        Returns: undefined
+      }
       current_driver_id: { Args: never; Returns: string }
+      driver_earnings: {
+        Args: { p_date_from: string; p_date_to: string; p_driver_id: string }
+        Returns: number
+      }
       is_admin: { Args: never; Returns: boolean }
       is_staff_or_admin: { Args: never; Returns: boolean }
       log_operation: {
