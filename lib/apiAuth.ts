@@ -30,6 +30,44 @@ export async function requireStaffOrAdmin(req: NextApiRequest, res: NextApiRespo
   return { supabase, profile };
 }
 
+// マイページ系APIルート共通の認可チェック。profiles.role='ドライバー'かつ
+// drivers.profile_idで紐づくdrivers行が存在することまで確認する。
+export async function requireDriver(req: NextApiRequest, res: NextApiResponse) {
+  const supabase = createClient(req, res);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    res.status(401).json({ error: "認証が必要です。" });
+    return null;
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, name, role")
+    .eq("id", user.id)
+    .single();
+
+  if (!profile || profile.role !== "ドライバー") {
+    res.status(403).json({ error: "権限がありません。" });
+    return null;
+  }
+
+  const { data: driver } = await supabase
+    .from("drivers")
+    .select("id, name, area_id, pay_type")
+    .eq("profile_id", profile.id)
+    .single();
+
+  if (!driver) {
+    res.status(403).json({ error: "ドライバー情報が見つかりません。" });
+    return null;
+  }
+
+  return { supabase, profile, driver };
+}
+
 export async function logOperation(
   supabase: ReturnType<typeof createClient>,
   params: {

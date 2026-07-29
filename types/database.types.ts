@@ -1107,6 +1107,10 @@ export type Database = {
         Returns: undefined
       }
       current_driver_id: { Args: never; Returns: string }
+      driver_available_advance: {
+        Args: { p_period_month: string }
+        Returns: number
+      }
       driver_earnings: {
         Args: { p_date_from: string; p_date_to: string; p_driver_id: string }
         Returns: number

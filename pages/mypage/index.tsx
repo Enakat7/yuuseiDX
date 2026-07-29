@@ -1,12 +1,23 @@
 import Head from "next/head";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import DriverLayout from "@/components/DriverLayout";
 import { useCurrentUser } from "@/lib/currentUser";
+import { apiRequest } from "@/lib/apiClient";
+import type { MySummary } from "@/types/domain/mypage";
 
 const NOTICES: { title: string; tone: string; label: string; detail: string }[] = [];
 
 export default function DriverDashboardPage() {
   const { user } = useCurrentUser();
+  const [summary, setSummary] = useState<MySummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiRequest<{ data: MySummary }>("/api/me/summary")
+      .then((res) => setSummary(res.data))
+      .catch((err) => setError(err instanceof Error ? err.message : "取得に失敗しました。"));
+  }, []);
 
   return (
     <>
@@ -20,17 +31,25 @@ export default function DriverDashboardPage() {
           </div>
         </div>
 
+        {error && (
+          <p className="text-sm" style={{ color: "var(--black)", marginBottom: 12 }}>
+            {error}
+          </p>
+        )}
+
         <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 20 }}>
           <div className="stat-card">
             <div className="stat-card__label">今月の稼働件数</div>
             <div className="stat-card__value">
-              —<small>件</small>
+              {summary ? summary.workedDaysThisMonth : "—"}
+              <small>件</small>
             </div>
           </div>
           <div className="stat-card">
             <div className="stat-card__label">前払可能額</div>
             <div className="stat-card__value">
-              —<small>千円</small>
+              {summary ? Math.round(summary.availableAdvance / 1000).toLocaleString("ja-JP") : "—"}
+              <small>千円</small>
             </div>
           </div>
         </div>
@@ -74,6 +93,11 @@ export default function DriverDashboardPage() {
             style={{ textDecoration: "none", color: "inherit", display: "block", padding: 22, textAlign: "center" }}
           >
             <div style={{ fontWeight: 900, fontSize: 15 }}>支払通知書</div>
+            {summary?.latestPayment && (
+              <div className="text-sm text-muted" style={{ marginTop: 6 }}>
+                最新: {summary.latestPayment.status}
+              </div>
+            )}
           </Link>
         </div>
       </DriverLayout>
