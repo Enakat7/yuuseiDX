@@ -2,11 +2,13 @@ import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import Modal from "@/components/Modal";
+import CsvImportModal from "@/components/CsvImportModal";
 import { buildMonthGridFromDates, DOW_LABELS } from "@/lib/calendar";
 import { AREA_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
-import { toCsv, downloadCsv } from "@/lib/csv";
+import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import { addDays, getWeekDates, getWeekRange, toIsoDate } from "@/lib/date";
+import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import type { ScheduleRow } from "@/types/domain/schedule";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -42,6 +44,7 @@ export default function SchedulePage() {
 
   const [openDriverId, setOpenDriverId] = useState<string | null>(null);
   const [monthWorkedDates, setMonthWorkedDates] = useState<Set<string>>(new Set());
+  const [showImportModal, setShowImportModal] = useState(false);
 
   async function loadAll() {
     setLoading(true);
@@ -154,6 +157,32 @@ export default function SchedulePage() {
     ]);
     downloadCsv(`稼働表_${area}_${toIsoDate(weekStart)}.csv`, csv);
   }
+
+  async function handleImportFile(file: File) {
+    const parsedRows = await parseCsv<Record<string, string>>(file, [
+      { key: "driver", header: "ドライバー" },
+      ...weekDates.map((d) => ({ key: d.label, header: d.label })),
+    ]);
+
+    let count = 0;
+    for (const parsedRow of parsedRows) {
+      const row = rows.find((r) => r.driverName === parsedRow.driver);
+      if (!row) continue;
+      for (const d of weekDates) {
+        const raw = parsedRow[d.label];
+        if (raw === undefined || raw === "") continue;
+        await apiRequest("/api/schedule/days", {
+          method: "POST",
+          body: JSON.stringify({ driver_id: row.driverId, work_date: d.iso, worked: raw.trim() === "◯" }),
+        });
+      }
+      count += 1;
+    }
+    await loadAll();
+    return count;
+  }
+
+  useCsvImportShortcut(() => setShowImportModal(true));
 
   const openDriver = rows.find((r) => r.driverId === openDriverId) ?? null;
   const monthGrid = useMemo(() => {
@@ -374,6 +403,15 @@ export default function SchedulePage() {
             </span>
           </div>
         </Modal>
+      )}
+
+      {showImportModal && (
+        <CsvImportModal
+          title="発注書(稼働表) CSVインポート"
+          description="表示中の週に取り込みます。列: ドライバー・（曜日ラベルを列見出しとした◯/-）"
+          onImport={handleImportFile}
+          onClose={() => setShowImportModal(false)}
+        />
       )}
     </>
   );

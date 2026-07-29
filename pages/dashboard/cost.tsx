@@ -1,9 +1,11 @@
 import Head from "next/head";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
+import CsvImportModal from "@/components/CsvImportModal";
 import { AREA_FILTER_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
+import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import type { CostRow } from "@/types/domain/cost";
 
 function formatYen(value: number) {
@@ -16,7 +18,7 @@ function currentMonthIso(): string {
 }
 
 export default function CostPage() {
-  const importInputRef = useRef<HTMLInputElement>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   const [area, setArea] = useState<(typeof AREA_FILTER_TABS)[number]>("全エリア");
   const [month, setMonth] = useState(currentMonthIso());
@@ -134,41 +136,33 @@ export default function CostPage() {
   }
 
   async function handleImportFile(file: File) {
-    setSaving(true);
-    setError(null);
-    try {
-      const parsedRows = await parseCsv<Record<string, string>>(
-        file,
-        [
-          { key: "driver", header: "ドライバー" },
-          { key: "area", header: "エリア" },
-          ...columns.map((c) => ({ key: c, header: c })),
-        ]
-      );
+    const parsedRows = await parseCsv<Record<string, string>>(file, [
+      { key: "driver", header: "ドライバー" },
+      { key: "area", header: "エリア" },
+      ...columns.map((c) => ({ key: c, header: c })),
+    ]);
 
-      const entries: { item_id: string; amount: number }[] = [];
-      for (const parsedRow of parsedRows) {
-        const row = rows.find((r) => r.driverName === parsedRow.driver);
-        if (!row) continue;
-        for (const item of row.items) {
-          const raw = parsedRow[item.label];
-          if (raw === undefined || raw === "") continue;
-          entries.push({ item_id: item.itemId, amount: Number(raw) || 0 });
-        }
+    const entries: { item_id: string; amount: number }[] = [];
+    for (const parsedRow of parsedRows) {
+      const row = rows.find((r) => r.driverName === parsedRow.driver);
+      if (!row) continue;
+      for (const item of row.items) {
+        const raw = parsedRow[item.label];
+        if (raw === undefined || raw === "") continue;
+        entries.push({ item_id: item.itemId, amount: Number(raw) || 0 });
       }
-      if (entries.length > 0) {
-        await apiRequest("/api/cost/amounts", {
-          method: "POST",
-          body: JSON.stringify({ period_month: month, entries }),
-        });
-      }
-      await loadAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "インポートに失敗しました。");
-    } finally {
-      setSaving(false);
     }
+    if (entries.length > 0) {
+      await apiRequest("/api/cost/amounts", {
+        method: "POST",
+        body: JSON.stringify({ period_month: month, entries }),
+      });
+    }
+    await loadAll();
+    return entries.length;
   }
+
+  useCsvImportShortcut(() => setShowImportModal(true));
 
   return (
     <>
@@ -185,20 +179,6 @@ export default function CostPage() {
           </div>
           <div className="flex">
             <input type="month" value={month.slice(0, 7)} onChange={(e) => setMonth(`${e.target.value}-01`)} />
-            <input
-              ref={importInputRef}
-              type="file"
-              accept=".csv"
-              style={{ display: "none" }}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) handleImportFile(file);
-                event.target.value = "";
-              }}
-            />
-            <button className="btn btn--ghost" onClick={() => importInputRef.current?.click()} disabled={saving}>
-              CSVインポート
-            </button>
             <button className="btn btn--ghost" onClick={handleExport}>
               CSVエクスポート
             </button>
@@ -336,6 +316,15 @@ export default function CostPage() {
           </div>
         )}
       </OperationLayout>
+
+      {showImportModal && (
+        <CsvImportModal
+          title="管理費集計 CSVインポート"
+          description="列: ドライバー・エリア・（表示中の項目名を列見出しとした金額）"
+          onImport={handleImportFile}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
     </>
   );
 }

@@ -2,9 +2,11 @@ import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import Modal from "@/components/Modal";
+import CsvImportModal from "@/components/CsvImportModal";
 import { apiRequest } from "@/lib/apiClient";
-import { toCsv, downloadCsv } from "@/lib/csv";
+import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import { getWeekRange } from "@/lib/date";
+import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import type { PaymentNoticeDetail, PaymentNoticeRow, PaymentStatus } from "@/types/domain/payment";
 
 const STATUS_TABS = ["すべて", "未承認", "仮確定", "確定"] as const;
@@ -30,6 +32,7 @@ export default function PaymentPage() {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<PaymentNoticeDetail | null>(null);
   const [reviseDraft, setReviseDraft] = useState<Record<string, string>>({});
+  const [showImportModal, setShowImportModal] = useState(false);
 
   async function loadAll() {
     setLoading(true);
@@ -168,6 +171,34 @@ export default function PaymentPage() {
     ]);
     downloadCsv("支払通知書.csv", csv);
   }
+
+  async function handleImportFile(file: File) {
+    const parsedRows = await parseCsv<{
+      driver: string;
+      pay_type: string;
+      period_start: string;
+      period_end: string;
+      amount: string;
+      status: string;
+      remarks: string;
+    }>(file, [
+      { key: "driver", header: "ドライバー" },
+      { key: "pay_type", header: "支払種別" },
+      { key: "period_start", header: "対象期間開始" },
+      { key: "period_end", header: "対象期間終了" },
+      { key: "amount", header: "金額" },
+      { key: "status", header: "ステータス" },
+      { key: "remarks", header: "備考" },
+    ]);
+    const res = await apiRequest<{ imported: number }>("/api/payments/import", {
+      method: "POST",
+      body: JSON.stringify({ rows: parsedRows }),
+    });
+    await loadAll();
+    return res.imported;
+  }
+
+  useCsvImportShortcut(() => setShowImportModal(true));
 
   return (
     <>
@@ -397,6 +428,15 @@ export default function PaymentPage() {
             </>
           )}
         </Modal>
+      )}
+
+      {showImportModal && (
+        <CsvImportModal
+          title="支払通知書 CSVインポート"
+          description="テストデータ投入用（生成・承認・確定フローを経由せず直接upsertします）。列: ドライバー・支払種別・対象期間開始・対象期間終了・金額・ステータス・備考"
+          onImport={handleImportFile}
+          onClose={() => setShowImportModal(false)}
+        />
       )}
     </>
   );

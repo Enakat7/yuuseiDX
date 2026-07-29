@@ -1,8 +1,10 @@
 import Head from "next/head";
 import { useEffect, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
+import CsvImportModal from "@/components/CsvImportModal";
 import { apiRequest } from "@/lib/apiClient";
-import { toCsv, downloadCsv } from "@/lib/csv";
+import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
+import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import type { AdvanceRequestRow, AdvanceSimulation, AdvanceStatus } from "@/types/domain/advance";
 import type { Driver } from "@/types/domain/master";
 
@@ -29,6 +31,7 @@ export default function AdvancePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   async function loadInitial() {
     setLoading(true);
@@ -129,6 +132,35 @@ export default function AdvancePage() {
     );
     downloadCsv("前払依頼書.csv", csv);
   }
+
+  async function handleImportFile(file: File) {
+    const parsedRows = await parseCsv<{ driver: string; payout_date: string; amount: string; note: string }>(file, [
+      { key: "driver", header: "ドライバー" },
+      { key: "payout_date", header: "入金日" },
+      { key: "amount", header: "前払金額" },
+      { key: "note", header: "備考" },
+    ]);
+
+    let count = 0;
+    for (const row of parsedRows) {
+      const driver = drivers.find((d) => d.name === row.driver);
+      if (!driver || !row.payout_date || !row.amount) continue;
+      await apiRequest("/api/advance", {
+        method: "POST",
+        body: JSON.stringify({
+          driver_id: driver.id,
+          payout_date: row.payout_date,
+          amount: Number(row.amount) || 0,
+          note: row.note || "",
+        }),
+      });
+      count += 1;
+    }
+    await loadInitial();
+    return count;
+  }
+
+  useCsvImportShortcut(() => setShowImportModal(true));
 
   return (
     <>
@@ -281,6 +313,15 @@ export default function AdvancePage() {
           </div>
         </div>
       </OperationLayout>
+
+      {showImportModal && (
+        <CsvImportModal
+          title="前払依頼書 CSVインポート"
+          description="列: ドライバー・入金日・前払金額・備考（依頼No・前払可能額・ステータスは自動算出されます）"
+          onImport={handleImportFile}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
     </>
   );
 }

@@ -1,10 +1,12 @@
 import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
+import CsvImportModal from "@/components/CsvImportModal";
 import { addDays, formatDate } from "@/lib/date";
 import { AREA_FILTER_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
-import { toCsv, downloadCsv } from "@/lib/csv";
+import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
+import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import type { CountCategory } from "@/types/domain/master";
 import type { CountRow, CountSummaryRow } from "@/types/domain/count";
 
@@ -32,6 +34,7 @@ export default function AggregationPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
 
   useEffect(() => {
     // 件数区分（10区分）は初回のみ取得すればよい
@@ -174,6 +177,37 @@ export default function AggregationPage() {
       downloadCsv(`件数集計_${period}_${isoDate}.csv`, csv);
     }
   }
+
+  async function handleImportFile(file: File) {
+    const parsedRows = await parseCsv<Record<string, string>>(file, [
+      { key: "driver", header: "ドライバー" },
+      { key: "area", header: "エリア" },
+      ...categories.map((c) => ({ key: c.id, header: c.label })),
+    ]);
+
+    const importRows: { driver_id: string; counts: Record<string, number> }[] = [];
+    for (const parsedRow of parsedRows) {
+      const row = rows.find((r) => r.driverName === parsedRow.driver);
+      if (!row) continue;
+      const counts: Record<string, number> = {};
+      for (const cat of categories) {
+        const raw = parsedRow[cat.id];
+        if (raw === undefined || raw === "") continue;
+        counts[cat.id] = Number(raw) || 0;
+      }
+      importRows.push({ driver_id: row.driverId, counts });
+    }
+    if (importRows.length > 0) {
+      await apiRequest("/api/counts", {
+        method: "POST",
+        body: JSON.stringify({ work_date: isoDate, rows: importRows }),
+      });
+    }
+    await loadDaily();
+    return importRows.length;
+  }
+
+  useCsvImportShortcut(() => setShowImportModal(true), period === "日次");
 
   return (
     <>
@@ -386,6 +420,15 @@ export default function AggregationPage() {
           )}
         </div>
       </OperationLayout>
+
+      {showImportModal && (
+        <CsvImportModal
+          title="件数集計 CSVインポート"
+          description="日次表示中の対象日に取り込みます。列: ドライバー・エリア・（件数区分名を列見出しとした件数）"
+          onImport={handleImportFile}
+          onClose={() => setShowImportModal(false)}
+        />
+      )}
     </>
   );
 }
