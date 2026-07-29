@@ -68,6 +68,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (linkError) return res.status(500).json({ error: linkError.message });
     }
 
+    // 管理費集計（6.4・6.5）の控除項目デフォルト7件をドライバー個別項目としてクローンする
+    const { data: defaults, error: defaultsError } = await supabase
+      .from("deduction_item_defaults")
+      .select("label, sort_order");
+    if (defaultsError) return res.status(500).json({ error: defaultsError.message });
+    if (defaults && defaults.length > 0) {
+      const { error: deductionError } = await supabase.from("deduction_items").insert(
+        defaults.map((d) => ({ driver_id: driver.id, label: d.label, sort_order: d.sort_order }))
+      );
+      if (deductionError) return res.status(500).json({ error: deductionError.message });
+    }
+
     await logOperation(supabase, {
       action: "新規登録",
       screenName: "マスタ管理(ドライバー)",

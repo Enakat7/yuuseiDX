@@ -167,6 +167,104 @@ export type Database = {
           },
         ]
       }
+      deduction_amounts: {
+        Row: {
+          amount: number
+          created_at: string
+          deduction_item_id: string
+          entered_by: string | null
+          id: string
+          period_month: string
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          deduction_item_id: string
+          entered_by?: string | null
+          id?: string
+          period_month: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          deduction_item_id?: string
+          entered_by?: string | null
+          id?: string
+          period_month?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deduction_amounts_deduction_item_id_fkey"
+            columns: ["deduction_item_id"]
+            isOneToOne: false
+            referencedRelation: "deduction_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deduction_amounts_entered_by_fkey"
+            columns: ["entered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deduction_item_defaults: {
+        Row: {
+          id: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          id?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      deduction_items: {
+        Row: {
+          active: boolean
+          created_at: string
+          driver_id: string
+          id: string
+          label: string
+          sort_order: number
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          driver_id: string
+          id?: string
+          label: string
+          sort_order?: number
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          driver_id?: string
+          id?: string
+          label?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deduction_items_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_types: {
         Row: {
           active: boolean
