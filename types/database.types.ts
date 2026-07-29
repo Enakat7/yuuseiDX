@@ -96,6 +96,77 @@ export type Database = {
           },
         ]
       }
+      count_entries: {
+        Row: {
+          approved: boolean
+          approved_at: string | null
+          approved_by: string | null
+          category_id: string
+          count: number
+          created_at: string
+          driver_id: string
+          entered_by: string | null
+          id: string
+          updated_at: string
+          work_date: string
+        }
+        Insert: {
+          approved?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
+          category_id: string
+          count?: number
+          created_at?: string
+          driver_id: string
+          entered_by?: string | null
+          id?: string
+          updated_at?: string
+          work_date: string
+        }
+        Update: {
+          approved?: boolean
+          approved_at?: string | null
+          approved_by?: string | null
+          category_id?: string
+          count?: number
+          created_at?: string
+          driver_id?: string
+          entered_by?: string | null
+          id?: string
+          updated_at?: string
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "count_entries_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "count_entries_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "count_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "count_entries_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "count_entries_entered_by_fkey"
+            columns: ["entered_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_types: {
         Row: {
           active: boolean
