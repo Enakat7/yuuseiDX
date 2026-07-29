@@ -1,6 +1,7 @@
 # オペレーションダッシュボード実装プラン
 
-> ドライバー側画面（`/mypage`）の機能実装は対象外。ルーティング整理のみ実施済み。
+> ドライバー側画面（`/mypage`）はPhase 0〜11では対象外だった（ルーティング整理のみ実施済み）。
+> 下記Phase Dに実装プランを追記済みだが、着手はユーザー指示があってから。
 > REQUIREMENT.md（確定仕様）・question.md（未回答項目）と合わせて参照すること。
 
 ## 進捗状況
@@ -19,6 +20,7 @@
 | 9 | 設定／権限管理UI | 完了 |
 | 10 | ログ画面（リアルタイム表示） | 完了（ポーリング方式を採用） |
 | 11 | CSV出力の仕上げ・ページ権限の実強制 | 完了（PDF出力はテンプレート未提供のため保留） |
+| D | ドライバー側 `/mypage` 実装 | 未着手（プランのみ、下記参照） |
 
 保留事項: question.mdに追加されたドライバーマスタの詳細項目（UID・会社名・所属・契約形態〔個人委託／法人委託／直接雇用の3区分〕・役割・契約終了日／契約期限・単価自動取得・固定費・その他条件・緊急連絡先・住所・振込口座、車両情報、ガソリンカード、免許、書類6種等。REQUIREMENT.md §6.7・6.8に反映済み）は、`drivers`テーブルの大幅拡張が必要だが、ユーザー指示により**別途指示があるまで着手しない**。Phase 4以降は現状の`drivers`スキーマ（氏名・契約形態〔個人事業主／法人の2区分のまま〕・エリア・契約開始日・連絡先・支払種別）を前提に進める。
 
@@ -153,6 +155,44 @@
 
 **残課題（Phase 11の範囲外として明示的に見送り）**:
 - `pages/dashboard/index.tsx`（トップのサマリー画面）は全フェーズを通じて未着手のまま、稼働ドライバー数・稼働件数・要対応タスク等がすべて空のモック状態。集計ロジックや「要対応タスク」の定義自体が未確定のため、着手する場合は別途スコープを切って対応する。
+
+---
+
+## Phase D: ドライバー側 `/mypage` 実装（未着手・プランのみ）
+
+対象画面は`pages/mypage/index.tsx`（ホーム）・`order.tsx`（発注書）・`payment.tsx`（支払通知書）の3つ（REQUIREMENT.md §2・§3・§4.3）。オペレーション側で確立した「全データアクセスはサーバー側API Route経由」の方針をそのまま踏襲する。
+
+**すでに使える既存資産**（オペレーション側フェーズで先回りして用意済み）:
+- `public.current_driver_id()` — `auth.uid()`から`drivers.id`を引くSECURITY DEFINER関数（Phase 3）
+- `drivers_select_own`・`driver_districts_select_own` RLSポリシー — ドライバー本人は自分の行のみ閲覧可能（Phase 3で実装済み）
+- `public.acknowledge_payment_notice(p_notice_id, p_ip)` RPC — 支払通知書の「承認」ボタン用に用意済み（Phase 6）。個別・一括両対応は呼び出し側（フロント）でループすればよい
+- `lib/calendar.ts`の`buildMonthGridFromDates`、`lib/csv.ts`、`lib/apiClient.ts`の`apiRequest`はそのまま流用可能
+
+**追加が必要なRLSポリシー（新規マイグレーション）**:
+- `payment_notices_select_own`: `driver_id = current_driver_id() and status <> '未承認'`（仮確定・確定のみ閲覧可。件数未承認の段階はドライバーに見せない、要件6.2）
+- `payment_notice_items_select_own`: 親`payment_notices`が自分のものであることをEXISTSで確認して閲覧許可
+- `purchase_orders_select_own`: `driver_id = current_driver_id()`
+- `work_schedule_days_select_own`: `driver_id = current_driver_id()`
+- `driver_documents`・`count_entries`・`deduction_amounts`・`advance_requests`には**引き続きドライバー向けポリシーを追加しない**（要件1.3・6.8で非公開と確定済みの範囲）
+
+**API Route**（`lib/apiAuth.ts`に`requireStaffOrAdmin`と対になる`requireDriver(req, res)`ヘルパーを追加。ロールが`ドライバー`か確認し、`current_driver_id()`相当のdriver行も一緒に返す）:
+- `GET /api/me/summary` — ホーム画面用（今月の稼働日数の集計、支払通知書の直近ステータス）
+- `GET /api/me/orders` — 自分の`purchase_orders`一覧
+- `GET /api/me/orders/[id]/month` — 対象期間の稼働カレンダー（`work_schedule_days`ベース。オペレーション側`GET /api/schedule/month`と同ロジックをdriver_id固定で流用）
+- `GET /api/me/payments?status=` — 自分の`payment_notices`一覧（仮確定・確定のみ）
+- `GET /api/me/payments/[id]` — 詳細（`payment_notice_items`内訳・備考・修正履歴）
+- `POST /api/me/payments/acknowledge` — 承認（`ids: string[]`を受け取り`acknowledge_payment_notice`をループ呼び出し。個別・一括の両方をこの1本でカバー）
+
+**フロント**:
+- `pages/mypage/index.tsx` 実データ化：今月の稼働日数（`work_schedule_days`集計）、前払可能額（`driver_earnings()` − `deduction_amounts`、前払依頼書と同じ計算式）。「お知らせ」は仕様未確定のためスタブ表示のまま残す
+- `pages/mypage/order.tsx` 実データ化：発注書一覧＋ステータス、「詳細」でオペレーション側と同じ月間カレンダーモーダル（`lib/calendar.ts`を共用）、CSVダウンロード対応
+- `pages/mypage/payment.tsx` 実データ化：支払通知書一覧（仮確定／確定タブ）、詳細（内訳・備考・修正履歴）、「確認しました」承認ボタン（個別・一括、`acknowledge`エンドポイント呼び出し）、CSVダウンロード対応
+
+**着手前に確認・整理が必要な点**:
+- ドライバーダッシュボードの「お知らせ」機能の仕様（モックアップ想定のまま内容未定）
+- 請求書（月末単位、フォーマット・発行条件未定、現行モックアップ未反映）は引き続き対象外
+- 支払通知書のメール送付（閲覧用リンク、要件6.2・7.3）は、オペレーション側スタッフが送信をトリガーする機能として別途必要（`payment_notice_email_sends`テーブルは存在するが送信アクション自体は未実装）。mypage本体の実装ではなくオペレーション側の別タスクとして扱う
+- PDF出力はオペレーション側同様、クライアントからのテンプレート提供待ちのため保留
 
 ---
 
