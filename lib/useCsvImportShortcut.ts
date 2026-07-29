@@ -8,7 +8,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || target.isContentEditable;
 }
 
-// Shift+C → s → v の順次押下でCSVインポートモーダルを開くショートカット。
+// Shift+Ctrl+C → s → v の順次押下でCSVインポートモーダルを開くショートカット。
 // 入力欄にフォーカス中は編集中の誤爆を避けるため無効化する。
 export function useCsvImportShortcut(onTrigger: () => void, enabled = true) {
   const stepRef = useRef(0);
@@ -28,13 +28,13 @@ export function useCsvImportShortcut(onTrigger: () => void, enabled = true) {
       const key = event.key.toLowerCase();
       const step = stepRef.current;
 
-      if (step === 0 && event.shiftKey && key === "c") {
+      if (step === 0 && event.shiftKey && event.ctrlKey && key === "c") {
         stepRef.current = 1;
         lastTimeRef.current = now;
-      } else if (step === 1 && !event.shiftKey && key === "s") {
+      } else if (step === 1 && !event.shiftKey && !event.ctrlKey && key === "s") {
         stepRef.current = 2;
         lastTimeRef.current = now;
-      } else if (step === 2 && !event.shiftKey && key === "v") {
+      } else if (step === 2 && !event.shiftKey && !event.ctrlKey && key === "v") {
         stepRef.current = 0;
         event.preventDefault();
         onTrigger();
