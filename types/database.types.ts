@@ -34,6 +34,317 @@ export type Database = {
   }
   public: {
     Tables: {
+      areas: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      count_categories: {
+        Row: {
+          created_at: string
+          delivery_type_id: string | null
+          id: string
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_type_id?: string | null
+          id?: string
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_type_id?: string | null
+          id?: string
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "count_categories_delivery_type_id_fkey"
+            columns: ["delivery_type_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_types: {
+        Row: {
+          active: boolean
+          code: string
+          created_at: string
+          id: string
+          name: string
+          price_master_target: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          price_master_target?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          price_master_target?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      districts: {
+        Row: {
+          active: boolean
+          area_id: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          area_id: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          area_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "districts_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_types: {
+        Row: {
+          created_at: string
+          id: string
+          is_expiring: boolean
+          is_system: boolean
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_expiring?: boolean
+          is_system?: boolean
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_expiring?: boolean
+          is_system?: boolean
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      driver_districts: {
+        Row: {
+          district_id: string
+          driver_id: string
+        }
+        Insert: {
+          district_id: string
+          driver_id: string
+        }
+        Update: {
+          district_id?: string
+          driver_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_districts_district_id_fkey"
+            columns: ["district_id"]
+            isOneToOne: false
+            referencedRelation: "districts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_districts_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_documents: {
+        Row: {
+          created_at: string
+          document_type_id: string
+          driver_id: string
+          expires_on: string | null
+          id: string
+          original_filename: string
+          storage_path: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          document_type_id: string
+          driver_id: string
+          expires_on?: string | null
+          id?: string
+          original_filename: string
+          storage_path: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          document_type_id?: string
+          driver_id?: string
+          expires_on?: string | null
+          id?: string
+          original_filename?: string
+          storage_path?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_documents_document_type_id_fkey"
+            columns: ["document_type_id"]
+            isOneToOne: false
+            referencedRelation: "document_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_documents_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drivers: {
+        Row: {
+          active: boolean
+          area_id: string
+          contract_start_date: string
+          contract_type: string
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          pay_type: string
+          phone: string | null
+          profile_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          area_id: string
+          contract_start_date: string
+          contract_type: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          pay_type: string
+          phone?: string | null
+          profile_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          area_id?: string
+          contract_start_date?: string
+          contract_type?: string
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          pay_type?: string
+          phone?: string | null
+          profile_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drivers_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drivers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       operation_logs: {
         Row: {
           action: string
@@ -143,11 +454,67 @@ export type Database = {
         }
         Relationships: []
       }
+      unit_prices: {
+        Row: {
+          area_id: string
+          created_at: string
+          created_by: string | null
+          delivery_type_id: string
+          effective_from: string
+          id: string
+          price_kind: string
+          price_yen: number
+        }
+        Insert: {
+          area_id: string
+          created_at?: string
+          created_by?: string | null
+          delivery_type_id: string
+          effective_from: string
+          id?: string
+          price_kind: string
+          price_yen: number
+        }
+        Update: {
+          area_id?: string
+          created_at?: string
+          created_by?: string | null
+          delivery_type_id?: string
+          effective_from?: string
+          id?: string
+          price_kind?: string
+          price_yen?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unit_prices_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_prices_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "unit_prices_delivery_type_id_fkey"
+            columns: ["delivery_type_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      current_driver_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_staff_or_admin: { Args: never; Returns: boolean }
       log_operation: {

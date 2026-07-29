@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 const TABS = [
   { label: "ドライバー", href: "/dashboard/master" },
   { label: "単価", href: "/dashboard/master/price" },
+  { label: "配送種別", href: "/dashboard/master/type" },
 ];
 
 export default function MasterTabs() {
