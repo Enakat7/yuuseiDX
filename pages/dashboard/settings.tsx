@@ -3,6 +3,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import Modal from "@/components/Modal";
 import { apiRequest } from "@/lib/apiClient";
+import { toCsv, downloadCsv } from "@/lib/csv";
 import { OPERATION_PAGE_KEYS, OPERATION_PAGE_LABELS } from "@/lib/pages";
 import type { AccountRow, OperationAccountRole } from "@/types/domain/settings";
 
@@ -83,6 +84,17 @@ export default function SettingsPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleExportAccounts() {
+    const csv = toCsv(
+      accounts.map((a) => ({ name: a.name, role: a.role })),
+      [
+        { key: "name", header: "氏名" },
+        { key: "role", header: "権限" },
+      ]
+    );
+    downloadCsv("アカウント一覧.csv", csv);
   }
 
   async function handleChangeRole(id: string, role: OperationAccountRole) {
@@ -178,6 +190,9 @@ export default function SettingsPage() {
           <div className="panel">
             <div className="panel__head">
               <h3>アカウント・権限管理</h3>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={handleExportAccounts}>
+                CSVエクスポート
+              </button>
             </div>
             <div className="panel__body">
               <div className="table-wrap">

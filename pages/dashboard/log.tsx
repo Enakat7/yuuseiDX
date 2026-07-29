@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import { useCurrentUser } from "@/lib/currentUser";
 import { apiRequest } from "@/lib/apiClient";
+import { toCsv, downloadCsv } from "@/lib/csv";
 import type { OperationLog } from "@/types/domain/log";
 
 const ROLE_FILTERS = ["すべて", "管理者", "スタッフ"] as const;
@@ -83,6 +84,24 @@ export default function OperationLogPage() {
 
   const visibleEntries = useMemo(() => entries, [entries]);
 
+  function handleExport() {
+    const csv = toCsv(
+      visibleEntries.map((entry) => ({
+        time: new Date(entry.created_at).toLocaleString("ja-JP"),
+        role: entry.actor_role,
+        name: entry.actor_name,
+        content: formatEntry(entry),
+      })),
+      [
+        { key: "time", header: "日時" },
+        { key: "role", header: "権限" },
+        { key: "name", header: "氏名" },
+        { key: "content", header: "内容" },
+      ]
+    );
+    downloadCsv("操作ログ.csv", csv);
+  }
+
   if (ready && user.role !== "管理者") {
     return (
       <OperationLayout>
@@ -102,6 +121,9 @@ export default function OperationLogPage() {
             <h2>ログ</h2>
             <p className="content__lead">誰がどのデータを操作したかをリアルタイムに確認します（管理者限定）。</p>
           </div>
+          <button type="button" className="btn btn--ghost" onClick={handleExport}>
+            CSVエクスポート
+          </button>
         </div>
 
         {error && (

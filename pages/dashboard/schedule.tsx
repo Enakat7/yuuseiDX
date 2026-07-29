@@ -5,6 +5,7 @@ import Modal from "@/components/Modal";
 import { buildMonthGridFromDates, DOW_LABELS } from "@/lib/calendar";
 import { AREA_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
+import { toCsv, downloadCsv } from "@/lib/csv";
 import { addDays, getWeekDates, getWeekRange, toIsoDate } from "@/lib/date";
 import type { ScheduleRow } from "@/types/domain/schedule";
 
@@ -137,6 +138,23 @@ export default function SchedulePage() {
     }
   }
 
+  function handleExport() {
+    const csvRows = rows.map((row) => {
+      const base: Record<string, string> = { driver: row.driverName };
+      weekDates.forEach((d, index) => {
+        base[d.label] = row.week[index] ? "◯" : "-";
+      });
+      base["発注書状況"] = STATUS_LABEL[row.orderStatus ?? "未送信"];
+      return base;
+    });
+    const csv = toCsv(csvRows, [
+      { key: "driver", header: "ドライバー" },
+      ...weekDates.map((d) => ({ key: d.label as keyof (typeof csvRows)[number], header: d.label })),
+      { key: "発注書状況", header: "発注書状況" },
+    ]);
+    downloadCsv(`稼働表_${area}_${toIsoDate(weekStart)}.csv`, csv);
+  }
+
   const openDriver = rows.find((r) => r.driverId === openDriverId) ?? null;
   const monthGrid = useMemo(() => {
     if (!openDriver) return null;
@@ -209,6 +227,9 @@ export default function SchedulePage() {
             <h3>{area}エリア — 稼働表</h3>
             <div className="flex" style={{ gap: 12, alignItems: "center" }}>
               <span className="text-sm text-muted">{rows.length}名 稼働中</span>
+              <button type="button" className="btn btn--ghost btn--sm" onClick={handleExport}>
+                CSVエクスポート
+              </button>
               <div className="date-nav">
                 <button
                   type="button"

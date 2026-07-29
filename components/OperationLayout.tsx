@@ -1,6 +1,8 @@
 import { useRouter } from "next/router";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useCurrentUser } from "@/lib/currentUser";
+import { apiRequest } from "@/lib/apiClient";
+import type { OperationPageKey } from "@/lib/pages";
 import Link from "next/link";
 
 async function handleLogout() {
@@ -8,28 +10,66 @@ async function handleLogout() {
   window.location.href = "/login";
 }
 
-const NAV_ITEMS = [
-  { label: "ダッシュボード", href: "/dashboard" },
-  { label: "件数集計", href: "/dashboard/aggregation" },
-  { label: "管理費集計", href: "/dashboard/cost" },
-  { label: "発注書(稼働表)", href: "/dashboard/schedule" },
-  { label: "支払通知書", href: "/dashboard/payment" },
-  { label: "前払依頼書", href: "/dashboard/advance" },
-  { label: "マスタ管理", href: "/dashboard/master" },
-  { label: "設定", href: "/dashboard/settings" },
+const NAV_ITEMS: { label: string; href: string; pageKey: OperationPageKey }[] = [
+  { label: "ダッシュボード", href: "/dashboard", pageKey: "dashboard" },
+  { label: "件数集計", href: "/dashboard/aggregation", pageKey: "aggregation" },
+  { label: "管理費集計", href: "/dashboard/cost", pageKey: "cost" },
+  { label: "発注書(稼働表)", href: "/dashboard/schedule", pageKey: "schedule" },
+  { label: "支払通知書", href: "/dashboard/payment", pageKey: "payment" },
+  { label: "前払依頼書", href: "/dashboard/advance", pageKey: "advance" },
+  { label: "マスタ管理", href: "/dashboard/master", pageKey: "master" },
+  { label: "設定", href: "/dashboard/settings", pageKey: "settings" },
 ];
 
-const ADMIN_ONLY_ITEM = { label: "ログ", href: "/dashboard/log" };
+const ADMIN_ONLY_ITEM: { label: string; href: string; pageKey: OperationPageKey } = {
+  label: "ログ",
+  href: "/dashboard/log",
+  pageKey: "log",
+};
 
 function isActive(pathname: string, href: string) {
   if (href === "/dashboard") return pathname === href;
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+// pathnameから該当するページキーを求める（/dashboard/master/price のようなサブページも
+// masterに丸める）。
+function resolvePageKey(pathname: string): OperationPageKey {
+  const all = [...NAV_ITEMS, ADMIN_ONLY_ITEM];
+  const matched = all.find((item) => isActive(pathname, item.href));
+  return matched?.pageKey ?? "dashboard";
+}
+
 export default function OperationLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { user } = useCurrentUser();
-  const navItems = user.role === "管理者" ? [...NAV_ITEMS, ADMIN_ONLY_ITEM] : NAV_ITEMS;
+  const { user, ready } = useCurrentUser();
+  const [blockedKeys, setBlockedKeys] = useState<Set<OperationPageKey> | null>(null);
+
+  useEffect(() => {
+    if (!ready || user.role === "管理者") return;
+    apiRequest<{ data: { pageKey: OperationPageKey; canAccess: boolean }[] }>("/api/me/permissions")
+      .then((res) => {
+        setBlockedKeys(new Set(res.data.filter((p) => !p.canAccess).map((p) => p.pageKey)));
+      })
+      .catch(() => {
+        // 取得失敗時は制限なし（既定はアクセス許可）として扱う
+        setBlockedKeys(new Set());
+      });
+  }, [ready, user.role]);
+
+  useEffect(() => {
+    if (!ready || user.role === "管理者" || blockedKeys === null) return;
+    const currentKey = resolvePageKey(router.pathname);
+    if (blockedKeys.has(currentKey)) {
+      // 全ページ制限されている場合はリダイレクトループを避けるため何もしない
+      const fallback = NAV_ITEMS.find((item) => !blockedKeys.has(item.pageKey));
+      if (fallback) router.replace(fallback.href);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, user.role, blockedKeys, router.pathname]);
+
+  const visibleNavItems = NAV_ITEMS.filter((item) => user.role === "管理者" || !blockedKeys?.has(item.pageKey));
+  const navItems = user.role === "管理者" ? [...visibleNavItems, ADMIN_ONLY_ITEM] : visibleNavItems;
 
   return (
     <div className="app">
