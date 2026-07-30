@@ -27,9 +27,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: "rowsが不正です。" });
   }
 
-  const [{ data: areas }, { data: districts }] = await Promise.all([
+  const [{ data: areas }, { data: districts }, { data: defaults }] = await Promise.all([
     supabase.from("areas").select("*"),
     supabase.from("districts").select("*"),
+    supabase.from("deduction_item_defaults").select("label, sort_order"),
   ]);
 
   let imported = 0;
@@ -73,6 +74,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await supabase.from("driver_districts").insert({ driver_id: driver.id, district_id: district.id });
       }
     }
+
+    // 管理費集計（6.4・6.5）の控除項目デフォルト7件をドライバー個別項目としてクローンする
+    // （単発作成のPOST /api/master/driversと同じ処理。CSV一括登録でも抜け漏れなく行う）
+    if (defaults && defaults.length > 0) {
+      await supabase.from("deduction_items").insert(
+        defaults.map((d) => ({ driver_id: driver.id, label: d.label, sort_order: d.sort_order }))
+      );
+    }
+
     imported += 1;
   }
 
