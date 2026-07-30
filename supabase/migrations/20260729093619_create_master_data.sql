@@ -16,19 +16,22 @@ create trigger areas_set_updated_at
   before update on public.areas
   for each row execute procedure public.set_updated_at();
 
-create trigger areas_audit
-  after insert or update or delete on public.areas
-  for each row execute procedure public.audit_trigger();
-
 create policy "areas_staff_or_admin_all"
   on public.areas for all
   to authenticated
   using (public.is_staff_or_admin())
   with check (public.is_staff_or_admin());
 
+-- 監査トリガーは初期データ投入後に作成する。投入時点では認証セッションがなく
+-- audit_trigger()内のactor解決がフォールバック（'スタッフ'/'system'）になるため、
+-- 実在しない操作者のログが記録されるのを避ける。
 insert into public.areas (name, sort_order) values
   ('西', 1), ('安佐南', 2), ('中央(中区)', 3), ('中央(東区)', 4),
   ('府中', 5), ('伴', 6), ('宇品', 7);
+
+create trigger areas_audit
+  after insert or update or delete on public.areas
+  for each row execute procedure public.audit_trigger();
 
 -- ===== 地区（エリア配下。マスタ管理画面としては未定のため、ドライバー登録時に
 -- その場で追加する運用を想定し、初期データは投入しない） =====
@@ -77,10 +80,6 @@ create trigger delivery_types_set_updated_at
   before update on public.delivery_types
   for each row execute procedure public.set_updated_at();
 
-create trigger delivery_types_audit
-  after insert or update or delete on public.delivery_types
-  for each row execute procedure public.audit_trigger();
-
 create policy "delivery_types_staff_or_admin_all"
   on public.delivery_types for all
   to authenticated
@@ -96,6 +95,10 @@ insert into public.delivery_types (code, name, price_master_target, sort_order) 
   ('L01', '大配送', true, 6),
   ('P01', '集荷①', true, 7),
   ('P02', '集荷②', true, 8);
+
+create trigger delivery_types_audit
+  after insert or update or delete on public.delivery_types
+  for each row execute procedure public.audit_trigger();
 
 -- ===== 件数集計の区分（要件6.3で確定した10区分）。配送種別マスタの8種に対応するものは
 -- delivery_type_idで紐づけ、ゆうパケット・不在個数は配送種別マスタに含まれない
@@ -115,10 +118,6 @@ create trigger count_categories_set_updated_at
   before update on public.count_categories
   for each row execute procedure public.set_updated_at();
 
-create trigger count_categories_audit
-  after insert or update or delete on public.count_categories
-  for each row execute procedure public.audit_trigger();
-
 create policy "count_categories_staff_or_admin_all"
   on public.count_categories for all
   to authenticated
@@ -131,6 +130,10 @@ union all
 select 'ゆうパケット', null, 9
 union all
 select '不在個数', null, 10;
+
+create trigger count_categories_audit
+  after insert or update or delete on public.count_categories
+  for each row execute procedure public.audit_trigger();
 
 -- ===== 書類種類マスタ（要件6.8で確定した8種＋追加可能） =====
 create table public.document_types (
@@ -149,10 +152,6 @@ create trigger document_types_set_updated_at
   before update on public.document_types
   for each row execute procedure public.set_updated_at();
 
-create trigger document_types_audit
-  after insert or update or delete on public.document_types
-  for each row execute procedure public.audit_trigger();
-
 create policy "document_types_staff_or_admin_all"
   on public.document_types for all
   to authenticated
@@ -168,6 +167,10 @@ insert into public.document_types (label, is_expiring, sort_order) values
   ('業務委託契約書', false, 6),
   ('履歴書', false, 7),
   ('貨物軽自動車運送事業経営届出書', false, 8);
+
+create trigger document_types_audit
+  after insert or update or delete on public.document_types
+  for each row execute procedure public.audit_trigger();
 
 -- ===== ドライバーマスタ（要件6.7） =====
 create table public.drivers (
