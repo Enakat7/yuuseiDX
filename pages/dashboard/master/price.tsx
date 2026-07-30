@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import MasterTabs from "@/components/MasterTabs";
 import { apiRequest } from "@/lib/apiClient";
@@ -25,12 +25,10 @@ export default function MasterPricePage() {
   const [areas, setAreas] = useState<Area[]>([]);
   const [deliveryTypes, setDeliveryTypes] = useState<DeliveryType[]>([]);
   const [allPrices, setAllPrices] = useState<UnitPrice[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedDate, setSelectedDate] = useState<string>("");
-  const [newDate, setNewDate] = useState("");
   const [draft, setDraft] = useState<Record<string, string>>({});
 
   const priceTargetTypes = deliveryTypes.filter((dt) => dt.price_master_target);
@@ -60,52 +58,36 @@ export default function MasterPricePage() {
     loadAll();
   }, []);
 
-  const effectiveDates = useMemo(() => {
-    const set = new Set(allPrices.map((p) => p.effective_from));
-    return Array.from(set).sort((a, b) => (a < b ? 1 : -1));
-  }, [allPrices]);
-
   useEffect(() => {
-    if (selectedDate || effectiveDates.length === 0) return;
+    // 現在有効な単価（本日以前で最新のeffective_from）を編集用ドラフトの初期値にする
+    // 導出状態のため無効化する
     const today = todayIso();
-    // 一覧取得後に既定の適用開始日を一度だけ選択する導出状態のため無効化する
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSelectedDate(effectiveDates.find((d) => d <= today) ?? effectiveDates[0]);
-  }, [effectiveDates, selectedDate]);
-
-  useEffect(() => {
-    // 適用開始日の切り替えに合わせて編集用ドラフトを再構築する導出状態のため無効化する
-    if (!selectedDate) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDraft({});
-      return;
+    const latestByCell = new Map<string, UnitPrice>();
+    for (const p of allPrices) {
+      if (p.effective_from > today) continue;
+      const key = cellKey(p.price_kind, p.area_id, p.delivery_type_id);
+      const current = latestByCell.get(key);
+      if (!current || p.effective_from > current.effective_from) {
+        latestByCell.set(key, p);
+      }
     }
     const next: Record<string, string> = {};
-    for (const p of allPrices) {
-      if (p.effective_from !== selectedDate) continue;
-      next[cellKey(p.price_kind, p.area_id, p.delivery_type_id)] = String(p.price_yen);
+    for (const [key, p] of latestByCell) {
+      next[key] = String(p.price_yen);
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(next);
-  }, [selectedDate, allPrices]);
-
-  function handleAddPeriod() {
-    if (!newDate) return;
-    setSelectedDate(newDate);
-    setNewDate("");
-  }
+  }, [allPrices]);
 
   function updateCell(kind: PriceKind, areaId: string, deliveryTypeId: string, value: string) {
     setDraft((prev) => ({ ...prev, [cellKey(kind, areaId, deliveryTypeId)]: value }));
   }
 
   async function handleSave() {
-    if (!selectedDate) {
-      setError("適用開始日を選択または追加してください。");
-      return;
-    }
     setSaving(true);
     setError(null);
     try {
+      const effectiveFrom = todayIso();
       const rows: {
         price_kind: PriceKind;
         area_id: string;
@@ -124,7 +106,7 @@ export default function MasterPricePage() {
               price_kind: kind,
               area_id: area.id,
               delivery_type_id: dt.id,
-              effective_from: selectedDate,
+              effective_from: effectiveFrom,
               price_yen: value,
             });
           }
@@ -165,7 +147,7 @@ export default function MasterPricePage() {
       { key: "受注単価", header: "受注単価" },
       { key: "卸単価", header: "卸単価" },
     ]);
-    downloadCsv(`単価マスタ_${selectedDate || todayIso()}.csv`, csv);
+    downloadCsv(`単価マスタ_${todayIso()}.csv`, csv);
   }
 
   async function handleImportFile(file: File) {
@@ -211,19 +193,6 @@ export default function MasterPricePage() {
             <p className="content__lead">エリア × 配送種別ごとの受単価・卸単価を管理します。</p>
           </div>
           <div className="flex">
-            {effectiveDates.length > 0 && (
-              <select
-                style={{ width: "auto" }}
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-              >
-                {effectiveDates.map((date) => (
-                  <option key={date} value={date}>
-                    適用開始日：{date}〜
-                  </option>
-                ))}
-              </select>
-            )}
             <input
               ref={importInputRef}
               type="file"
@@ -252,91 +221,56 @@ export default function MasterPricePage() {
 
         <MasterTabs />
 
-        <div className="panel" style={{ marginBottom: 22 }}>
-          <div className="panel__head">
-            <h3>適用期間</h3>
-          </div>
-          <div className="panel__body">
-            <div className="field-row">
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label htmlFor="new-period">新しい適用開始日を追加</label>
-                <input
-                  id="new-period"
-                  type="date"
-                  value={newDate}
-                  onChange={(e) => setNewDate(e.target.value)}
-                />
-              </div>
-              <div className="field" style={{ marginBottom: 0, alignSelf: "end" }}>
-                <button type="button" className="btn btn--ghost" onClick={handleAddPeriod}>
-                  この日付で編集を開始
-                </button>
-              </div>
+        {PRICE_KINDS.map(({ kind, title, note }) => (
+          <div className="panel" key={kind}>
+            <div className="panel__head">
+              <h3>{title}</h3>
+              <span className="text-sm text-muted">{note}</span>
             </div>
-            {selectedDate && !effectiveDates.includes(selectedDate) && (
-              <p className="text-sm text-muted" style={{ marginTop: 8 }}>
-                新規適用期間：{selectedDate}（保存するまでは未反映です）
-              </p>
-            )}
-          </div>
-        </div>
-
-        {!loading && !selectedDate && (
-          <p className="empty-note">単価マスタが未登録です。上の「適用期間」から開始日を追加してください。</p>
-        )}
-
-        {selectedDate &&
-          PRICE_KINDS.map(({ kind, title, note }) => (
-            <div className="panel" key={kind}>
-              <div className="panel__head">
-                <h3>{title}</h3>
-                <span className="text-sm text-muted">{note}</span>
-              </div>
-              <div className="table-wrap">
-                <table className="price-table">
-                  <thead>
-                    <tr>
-                      <th>配送種別</th>
+            <div className="table-wrap">
+              <table className="price-table">
+                <thead>
+                  <tr>
+                    <th>配送種別</th>
+                    {areas.map((area) => (
+                      <th className="area" key={area.id}>
+                        {area.name}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {priceTargetTypes.map((dt) => (
+                    <tr key={dt.id}>
+                      <td className="item">{dt.name}</td>
                       {areas.map((area) => (
-                        <th className="area" key={area.id}>
-                          {area.name}
-                        </th>
+                        <td className="cell" key={area.id}>
+                          <input
+                            className="price-input"
+                            type="number"
+                            step="0.01"
+                            value={draft[cellKey(kind, area.id, dt.id)] ?? ""}
+                            placeholder="未設定"
+                            onChange={(e) => updateCell(kind, area.id, dt.id, e.target.value)}
+                          />
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {priceTargetTypes.map((dt) => (
-                      <tr key={dt.id}>
-                        <td className="item">{dt.name}</td>
-                        {areas.map((area) => (
-                          <td className="cell" key={area.id}>
-                            <input
-                              className="price-input"
-                              type="number"
-                              value={draft[cellKey(kind, area.id, dt.id)] ?? ""}
-                              placeholder="未設定"
-                              onChange={(e) => updateCell(kind, area.id, dt.id, e.target.value)}
-                            />
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          ))}
-
-        {selectedDate && (
-          <div className="flex" style={{ justifyContent: "flex-end", marginTop: 20 }}>
-            <button className="btn btn--ghost" onClick={loadAll}>
-              変更を破棄
-            </button>
-            <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
-              {saving ? "保存中..." : "単価マスタを保存"}
-            </button>
           </div>
-        )}
+        ))}
+
+        <div className="flex" style={{ justifyContent: "flex-end", marginTop: 20 }}>
+          <button className="btn btn--ghost" onClick={loadAll}>
+            変更を破棄
+          </button>
+          <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
+            {saving ? "保存中..." : "単価マスタを保存"}
+          </button>
+        </div>
       </OperationLayout>
     </>
   );
