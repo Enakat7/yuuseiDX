@@ -920,6 +920,11 @@ textarea:focus {
   overflow-y: auto;
 }
 
+.modal-box--wide {
+  max-width: 1440px;
+  max-height: 94vh;
+}
+
 .modal-box__head {
   display: flex;
   align-items: center;

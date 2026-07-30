@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import CsvImportModal from "@/components/CsvImportModal";
+import Modal from "@/components/Modal";
 import { AREA_FILTER_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
@@ -30,8 +31,8 @@ export default function CostPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [newItemDriverId, setNewItemDriverId] = useState("");
-  const [newItemLabel, setNewItemLabel] = useState("");
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [newRows, setNewRows] = useState<{ driverId: string; amounts: Record<string, string> }[]>([]);
 
   const areaParam = area === "全エリア" ? "" : area;
 
@@ -98,19 +99,56 @@ export default function CostPage() {
     }
   }
 
-  async function handleAddItem() {
-    if (!newItemDriverId || !newItemLabel.trim()) return;
+  function openNewModal() {
+    setNewRows([{ driverId: "", amounts: {} }]);
+    setShowNewModal(true);
+  }
+
+  function addNewRow() {
+    setNewRows((prev) => [...prev, { driverId: "", amounts: {} }]);
+  }
+
+  function removeNewRow(index: number) {
+    setNewRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function newRowTotal(row: { amounts: Record<string, string> }): number {
+    return columns.reduce((sum, col) => sum + (Number(row.amounts[col]) || 0), 0);
+  }
+
+  async function handleBulkAdd() {
+    const targets = newRows.filter((row) => row.driverId);
+    if (targets.length === 0) return;
     setSaving(true);
     setError(null);
     try {
-      await apiRequest("/api/cost/items", {
-        method: "POST",
-        body: JSON.stringify({ driver_id: newItemDriverId, label: newItemLabel.trim() }),
-      });
-      setNewItemLabel("");
+      const entries: { item_id: string; amount: number }[] = [];
+      for (const target of targets) {
+        const driverRow = rows.find((row) => row.driverId === target.driverId);
+        for (const col of columns) {
+          const raw = target.amounts[col];
+          if (raw === undefined || raw === "") continue;
+          let itemId = driverRow?.items.find((item) => item.label === col)?.itemId;
+          if (!itemId) {
+            const res = await apiRequest<{ data: { id: string } }>("/api/cost/items", {
+              method: "POST",
+              body: JSON.stringify({ driver_id: target.driverId, label: col }),
+            });
+            itemId = res.data.id;
+          }
+          entries.push({ item_id: itemId, amount: Number(raw) || 0 });
+        }
+      }
+      if (entries.length > 0) {
+        await apiRequest("/api/cost/amounts", {
+          method: "POST",
+          body: JSON.stringify({ period_month: month, entries }),
+        });
+      }
+      setShowNewModal(false);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "項目の追加に失敗しました。");
+      setError(err instanceof Error ? err.message : "追加に失敗しました。");
     } finally {
       setSaving(false);
     }
@@ -173,14 +211,14 @@ export default function CostPage() {
         <div className="content__header">
           <div>
             <h2>管理費集計</h2>
-            <p className="content__lead">
-              ドライバーごとの管理費（控除予定額）を集計します。前払可能額の算出に使用されます。
-            </p>
           </div>
           <div className="flex">
             <input type="month" value={month.slice(0, 7)} onChange={(e) => setMonth(`${e.target.value}-01`)} />
             <button className="btn btn--ghost" onClick={handleExport}>
               CSVエクスポート
+            </button>
+            <button className="btn btn--ghost" onClick={openNewModal}>
+              + 新規
             </button>
             {editMode ? (
               <button className="btn btn--ghost" onClick={handleSave} disabled={saving}>
@@ -277,44 +315,6 @@ export default function CostPage() {
           </div>
         </div>
 
-        {rows.length > 0 && (
-          <div className="panel" style={{ marginTop: 22 }}>
-            <div className="panel__head">
-              <h3>ドライバー個別の控除項目を追加</h3>
-            </div>
-            <div className="panel__body">
-              <div className="field-row">
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label htmlFor="new-item-driver">ドライバー</label>
-                  <select
-                    id="new-item-driver"
-                    value={newItemDriverId}
-                    onChange={(e) => setNewItemDriverId(e.target.value)}
-                  >
-                    <option value="">選択してください</option>
-                    {rows.map((row) => (
-                      <option key={row.driverId} value={row.driverId}>
-                        {row.driverName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="field" style={{ marginBottom: 0 }}>
-                  <label htmlFor="new-item-label">項目名</label>
-                  <input
-                    id="new-item-label"
-                    type="text"
-                    value={newItemLabel}
-                    onChange={(e) => setNewItemLabel(e.target.value)}
-                  />
-                </div>
-              </div>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={handleAddItem} disabled={saving}>
-                + 追加
-              </button>
-            </div>
-          </div>
-        )}
       </OperationLayout>
 
       {showImportModal && (
@@ -324,6 +324,111 @@ export default function CostPage() {
           onImport={handleImportFile}
           onClose={() => setShowImportModal(false)}
         />
+      )}
+
+      {showNewModal && (
+        <Modal
+          title="管理費 新規追加"
+          subtitle={`対象月: ${month.slice(0, 7)}`}
+          onClose={() => setShowNewModal(false)}
+          wide
+          headerAction={
+            <button
+              type="button"
+              className="btn btn--primary btn--sm"
+              onClick={handleBulkAdd}
+              disabled={saving || !newRows.some((row) => row.driverId)}
+            >
+              {saving ? "保存中..." : "保存"}
+            </button>
+          }
+        >
+          <div className="table-wrap" style={{ maxHeight: "68vh", overflowY: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>ドライバー</th>
+                  <th>エリア</th>
+                  {columns.map((col) => (
+                    <th className="num" key={col}>
+                      {col}
+                    </th>
+                  ))}
+                  <th className="num">合計</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {newRows.map((newRow, index) => {
+                  const driverRow = rows.find((row) => row.driverId === newRow.driverId);
+                  return (
+                    <tr key={index}>
+                      <td style={{ padding: 0 }}>
+                        <select
+                          value={newRow.driverId}
+                          onChange={(e) =>
+                            setNewRows((prev) =>
+                              prev.map((r, i) => (i === index ? { ...r, driverId: e.target.value } : r))
+                            )
+                          }
+                        >
+                          <option value="">選択してください</option>
+                          {rows
+                            .filter(
+                              (row) =>
+                                row.driverId === newRow.driverId ||
+                                !newRows.some((r) => r.driverId === row.driverId)
+                            )
+                            .map((row) => (
+                              <option key={row.driverId} value={row.driverId}>
+                                {row.driverName}
+                              </option>
+                            ))}
+                        </select>
+                      </td>
+                      <td>{driverRow?.areaName ?? "-"}</td>
+                      {columns.map((col) => (
+                        <td className="num" key={col} style={{ padding: 0 }}>
+                          <input
+                            className="price-input"
+                            type="number"
+                            value={newRow.amounts[col] ?? ""}
+                            disabled={!newRow.driverId}
+                            onChange={(e) =>
+                              setNewRows((prev) =>
+                                prev.map((r, i) =>
+                                  i === index
+                                    ? { ...r, amounts: { ...r.amounts, [col]: e.target.value } }
+                                    : r
+                                )
+                              )
+                            }
+                          />
+                        </td>
+                      ))}
+                      <td className="num">
+                        <strong>{formatYen(newRowTotal(newRow))}</strong>
+                      </td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => removeNewRow(index)}
+                          aria-label="この行を削除"
+                        >
+                          ×
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <button type="button" className="btn btn--ghost btn--sm" style={{ marginTop: 12 }} onClick={addNewRow}>
+            + 行を追加
+          </button>
+        </Modal>
       )}
     </>
   );
