@@ -89,6 +89,57 @@ Dockerを使ってローカルにSupabase環境（DB・Auth・Storage等）を�
 | `npm run start` | ビルド済みアプリを起動 |
 | `npm run lint` | ESLint によるコードチェック |
 
+## 同一ネットワーク内の他PCからアクセスする
+
+`npm run dev` / `npm run start` はデフォルトでは `localhost` にのみバインドされるため、同じLAN内の他のPC・スマホからはアクセスできない。以下の手順でアクセス可能にする。
+
+> WSL2の「ミラーモード」ネットワークが有効な環境（WSL2とWindowsホストのIPアドレスが一致する構成）を前提とした手順。
+
+1. WSL2側のIPアドレスを確認
+
+   ```bash
+   ip -4 addr show
+   ```
+
+   `eth1`（環境により異なる）に表示される `inet` のアドレス（例: `192.168.24.130`）を確認する。
+
+2. Windows側のIPアドレスを確認し、WSL2側と一致するか確認
+
+   Windows の PowerShell / コマンドプロンプトで以下を実行。
+
+   ```powershell
+   ipconfig
+   ```
+
+   使用中のアダプタ（Wi-Fi等）の IPv4 アドレスが手順1のWSL2側のIPアドレスと一致していれば、ミラーモードが有効でポートフォワーディングの追加設定は不要。
+
+3. 全ネットワークインターフェースにバインドしてサーバーを起動
+
+   ```bash
+   npx next dev -H 0.0.0.0
+   # または
+   npx next start -H 0.0.0.0
+   ```
+
+4. Windows Defender ファイアウォールで該当ポート（デフォルト3000）の受信を許可
+
+   接続中のネットワークプロファイル（プライベート/パブリック）に対して着信がブロックされている場合、アクセスできない。以下のいずれかで許可する。
+
+   - GUI: 「Windows Defender ファイアウォール」→「詳細設定」→「受信の規則」→「新しい規則」→ポート → TCP `3000` → 接続を許可する → 該当プロファイルにチェック
+   - PowerShell（管理者権限）:
+
+     ```powershell
+     netsh advfirewall firewall add rule name="Next.js Dev Server (3000)" dir=in action=allow protocol=TCP localport=3000
+     ```
+
+   公衆Wi-Fi等の信頼できないネットワークでポートを開放すると、同一ネットワーク上の他の端末からもアクセス可能になる点に注意。検証後は不要な規則を削除しておくこと。
+
+5. 他のPC・スマホのブラウザから、手順1で確認したIPアドレスにアクセス
+
+   ```
+   http://192.168.24.130:3000
+   ```
+
 ## ディレクトリ構成（抜粋）
 
 ```
@@ -99,3 +150,5 @@ styles/      スタイルシート
 mockup/      HTML/CSSモックアップ
 supabase/    Supabaseのローカル設定・マイグレーション
 ```
+
+## 仕様書
