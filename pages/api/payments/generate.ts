@@ -49,6 +49,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     .lte("effective_from", body.period_end);
   if (priceError) return res.status(500).json({ error: priceError.message });
 
+  const { data: deliveryTypes, error: deliveryTypeError } = await supabase
+    .from("delivery_types")
+    .select("id, price_master_target");
+  if (deliveryTypeError) return res.status(500).json({ error: deliveryTypeError.message });
+  const nonTargetDeliveryTypeIds = new Set(
+    ((deliveryTypes as { id: string; price_master_target: boolean }[] | null) ?? [])
+      .filter((dt) => !dt.price_master_target)
+      .map((dt) => dt.id)
+  );
+
   let generated = 0;
   for (const driver of targetDrivers) {
     const { data: entries, error: entryError } = await supabase
@@ -62,8 +72,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const totalsByCategory = new Map<string, { count: number; deliveryTypeId: string | null }>();
     for (const entry of ((entries as unknown as EntryRow[] | null) ?? [])) {
+      const deliveryTypeId = entry.count_categories?.delivery_type_id ?? null;
+      // 単価マスタ対象外の配送種別に紐づく区分は支払通知書の明細に含めない
+      if (deliveryTypeId && nonTargetDeliveryTypeIds.has(deliveryTypeId)) continue;
       const key = entry.category_id;
-      const prev = totalsByCategory.get(key) ?? { count: 0, deliveryTypeId: entry.count_categories?.delivery_type_id ?? null };
+      const prev = totalsByCategory.get(key) ?? { count: 0, deliveryTypeId };
       prev.count += entry.count;
       totalsByCategory.set(key, prev);
     }

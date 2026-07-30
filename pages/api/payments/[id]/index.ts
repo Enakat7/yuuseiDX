@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { data: items, error: itemsError } = await supabase
     .from("payment_notice_items")
-    .select("*, count_categories(label)")
+    .select("*, count_categories(label, delivery_types(price_master_target))")
     .eq("payment_notice_id", id);
   if (itemsError) return res.status(500).json({ error: itemsError.message });
 
@@ -42,14 +42,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     [key: string]: unknown;
   };
 
+  type ItemRow = {
+    count_categories: { label: string; delivery_types: { price_master_target: boolean } | null } | null;
+    [key: string]: unknown;
+  };
+  // 単価マスタ対象外の配送種別に紐づく区分は明細に表示しない（過去に生成された通知書も対象）
+  const visibleItems = ((items as unknown as ItemRow[] | null) ?? [])
+    .filter((item) => {
+      const deliveryType = item.count_categories?.delivery_types;
+      return !deliveryType || deliveryType.price_master_target;
+    })
+    .map((item) => ({ ...item, categoryLabel: item.count_categories?.label ?? "" }));
+
   return res.status(200).json({
     data: {
       ...notice,
       driverName: noticeRow.driver?.name ?? "",
       areaName: noticeRow.area?.name ?? null,
-      items: ((items as unknown as { count_categories: { label: string } | null; [key: string]: unknown }[] | null) ?? []).map(
-        (item) => ({ ...item, categoryLabel: item.count_categories?.label ?? "" })
-      ),
+      items: visibleItems,
       revisions: revisions ?? [],
     },
   });
