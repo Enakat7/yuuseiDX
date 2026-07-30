@@ -285,7 +285,7 @@ create table public.unit_prices (
   area_id uuid not null references public.areas (id),
   delivery_type_id uuid not null references public.delivery_types (id),
   effective_from date not null,
-  price_yen integer not null,
+  price_yen numeric(10, 2) not null,
   created_by uuid references public.profiles (id),
   created_at timestamptz not null default now(),
   unique (price_kind, area_id, delivery_type_id, effective_from)
