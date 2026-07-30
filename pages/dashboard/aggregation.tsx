@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useEffect, useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import CsvImportModal from "@/components/CsvImportModal";
+import Modal from "@/components/Modal";
 import { addDays, formatDate } from "@/lib/date";
 import { AREA_FILTER_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
@@ -35,6 +36,9 @@ export default function AggregationPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [newRows, setNewRows] = useState<{ driverId: string; counts: Record<string, string> }[]>([]);
 
   useEffect(() => {
     // 件数区分（10区分）は初回のみ取得すればよい
@@ -126,6 +130,49 @@ export default function AggregationPage() {
       await loadDaily();
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openNewModal() {
+    setNewRows([{ driverId: "", counts: {} }]);
+    setShowNewModal(true);
+  }
+
+  function addNewRow() {
+    setNewRows((prev) => [...prev, { driverId: "", counts: {} }]);
+  }
+
+  function removeNewRow(index: number) {
+    setNewRows((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  async function handleBulkAdd() {
+    const bodyRows = newRows
+      .filter((row) => row.driverId)
+      .map((row) => {
+        const counts: Record<string, number> = {};
+        for (const cat of categories) {
+          const raw = row.counts[cat.id];
+          if (raw === undefined || raw === "") continue;
+          counts[cat.id] = Number(raw) || 0;
+        }
+        return { driver_id: row.driverId, counts };
+      })
+      .filter((row) => Object.keys(row.counts).length > 0);
+    if (bodyRows.length === 0) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest("/api/counts", {
+        method: "POST",
+        body: JSON.stringify({ work_date: isoDate, rows: bodyRows }),
+      });
+      setShowNewModal(false);
+      await loadDaily();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "追加に失敗しました。");
     } finally {
       setSaving(false);
     }
@@ -226,6 +273,11 @@ export default function AggregationPage() {
             <button className="btn btn--ghost" onClick={handleExport}>
               CSVエクスポート
             </button>
+            {period === "日次" && (
+              <button type="button" className="btn btn--ghost" onClick={openNewModal}>
+                + 新規
+              </button>
+            )}
             {period === "日次" &&
               (editMode ? (
                 <button type="button" className="btn btn--ghost" onClick={handleSave} disabled={saving}>
@@ -428,6 +480,107 @@ export default function AggregationPage() {
           onImport={handleImportFile}
           onClose={() => setShowImportModal(false)}
         />
+      )}
+
+      {showNewModal && (
+        <Modal
+          title="件数 新規追加"
+          subtitle={`対象日: ${isoDate}`}
+          onClose={() => setShowNewModal(false)}
+          wide
+          headerAction={
+            <button
+              type="button"
+              className="btn btn--primary btn--sm"
+              onClick={handleBulkAdd}
+              disabled={saving || !newRows.some((row) => row.driverId)}
+            >
+              {saving ? "保存中..." : "保存"}
+            </button>
+          }
+        >
+          <div className="table-wrap" style={{ maxHeight: "68vh", overflowY: "auto" }}>
+            <table>
+              <thead>
+                <tr>
+                  <th>ドライバー</th>
+                  <th>エリア</th>
+                  {categories.map((col) => (
+                    <th className="num" key={col.id}>
+                      {col.label}
+                    </th>
+                  ))}
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                {newRows.map((newRow, index) => {
+                  const driverRow = rows.find((row) => row.driverId === newRow.driverId);
+                  return (
+                    <tr key={index}>
+                      <td style={{ padding: 0 }}>
+                        <select
+                          value={newRow.driverId}
+                          onChange={(e) =>
+                            setNewRows((prev) =>
+                              prev.map((r, i) => (i === index ? { ...r, driverId: e.target.value } : r))
+                            )
+                          }
+                        >
+                          <option value="">選択してください</option>
+                          {rows
+                            .filter(
+                              (row) =>
+                                row.driverId === newRow.driverId ||
+                                !newRows.some((r) => r.driverId === row.driverId)
+                            )
+                            .map((row) => (
+                              <option key={row.driverId} value={row.driverId}>
+                                {row.driverName}
+                              </option>
+                            ))}
+                        </select>
+                      </td>
+                      <td>{driverRow?.areaName ?? "-"}</td>
+                      {categories.map((col) => (
+                        <td className="num" key={col.id} style={{ padding: 0 }}>
+                          <input
+                            className="price-input"
+                            type="number"
+                            value={newRow.counts[col.id] ?? ""}
+                            disabled={!newRow.driverId}
+                            onChange={(e) =>
+                              setNewRows((prev) =>
+                                prev.map((r, i) =>
+                                  i === index
+                                    ? { ...r, counts: { ...r.counts, [col.id]: e.target.value } }
+                                    : r
+                                )
+                              )
+                            }
+                          />
+                        </td>
+                      ))}
+                      <td>
+                        <button
+                          type="button"
+                          className="btn btn--ghost btn--sm"
+                          onClick={() => removeNewRow(index)}
+                          aria-label="この行を削除"
+                        >
+                          ×
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <button type="button" className="btn btn--ghost btn--sm" style={{ marginTop: 12 }} onClick={addNewRow}>
+            + 行を追加
+          </button>
+        </Modal>
       )}
     </>
   );
