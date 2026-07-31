@@ -1,0 +1,106 @@
+import Head from "next/head";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import DriverLayout from "@/components/DriverLayout";
+import { useCurrentUser } from "@/lib/currentUser";
+import { apiRequest } from "@/lib/apiClient";
+import type { MySummary } from "@/types/domain/mypage";
+
+const NOTICES: { title: string; tone: string; label: string; detail: string }[] = [];
+
+export default function DriverDashboardPage() {
+  const { user } = useCurrentUser();
+  const [summary, setSummary] = useState<MySummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiRequest<{ data: MySummary }>("/api/me/summary")
+      .then((res) => setSummary(res.data))
+      .catch((err) => setError(err instanceof Error ? err.message : "取得に失敗しました。"));
+  }, []);
+
+  return (
+    <>
+      <Head>
+        <title>ドライバーダッシュボード | YOU SAY!!</title>
+      </Head>
+      <DriverLayout>
+        <div className="content__header" style={{ marginBottom: 16 }}>
+          <div>
+            <h2 style={{ fontSize: 20 }}>こんにちは、{user.name}さん</h2>
+          </div>
+        </div>
+
+        {error && (
+          <p className="text-sm" style={{ color: "var(--black)", marginBottom: 12 }}>
+            {error}
+          </p>
+        )}
+
+        <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", marginBottom: 20 }}>
+          <div className="stat-card">
+            <div className="stat-card__label">今月の稼働件数</div>
+            <div className="stat-card__value">
+              {summary ? summary.workedDaysThisMonth : "—"}
+              <small>件</small>
+            </div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-card__label">前払可能額</div>
+            <div className="stat-card__value">
+              {summary ? Math.round(summary.availableAdvance / 1000).toLocaleString("ja-JP") : "—"}
+              <small>千円</small>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel">
+          <div className="panel__head">
+            <h3>お知らせ</h3>
+          </div>
+          <div className="panel__body">
+            {NOTICES.length === 0 ? (
+              <p className="empty-note">お知らせはありません。</p>
+            ) : (
+              <ul style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+                {NOTICES.map((notice) => (
+                  <li key={notice.title}>
+                    <div className="flex--between">
+                      <strong className="text-sm">{notice.title}</strong>
+                      <span className={`pill pill--${notice.tone}`}>{notice.label}</span>
+                    </div>
+                    <p className="text-sm text-muted" style={{ marginTop: 4 }}>
+                      {notice.detail}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <div className="grid" style={{ gridTemplateColumns: "1fr 1fr", marginTop: 20 }}>
+          <Link
+            href="/mypage/order"
+            className="panel"
+            style={{ textDecoration: "none", color: "inherit", display: "block", padding: 22, textAlign: "center" }}
+          >
+            <div style={{ fontWeight: 900, fontSize: 15 }}>発注書</div>
+          </Link>
+          <Link
+            href="/mypage/payment"
+            className="panel"
+            style={{ textDecoration: "none", color: "inherit", display: "block", padding: 22, textAlign: "center" }}
+          >
+            <div style={{ fontWeight: 900, fontSize: 15 }}>支払通知書</div>
+            {summary?.latestPayment && (
+              <div className="text-sm text-muted" style={{ marginTop: 6 }}>
+                最新: {summary.latestPayment.status}
+              </div>
+            )}
+          </Link>
+        </div>
+      </DriverLayout>
+    </>
+  );
+}

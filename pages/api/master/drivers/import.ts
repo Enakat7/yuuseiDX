@@ -1,0 +1,106 @@
+import type { NextApiRequest, NextApiResponse } from "next";
+import { logOperation, requireStaffOrAdmin } from "@/lib/apiAuth";
+import { CONTRACT_TYPES, PAY_TYPES } from "@/lib/constants";
+
+type ImportRow = {
+  name: string;
+  contract_type: string;
+  area: string;
+  districts: string;
+  contract_start_date: string;
+  phone: string;
+  email: string;
+  pay_type: string;
+};
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "Method Not Allowed" });
+  }
+
+  const auth = await requireStaffOrAdmin(req, res);
+  if (!auth) return;
+  const { supabase } = auth;
+
+  const { rows } = (req.body ?? {}) as { rows?: ImportRow[] };
+  if (!Array.isArray(rows)) {
+    return res.status(400).json({ error: "rowsが不正です。" });
+  }
+
+  const [{ data: areas }, { data: districts }, { data: defaults }] = await Promise.all([
+    supabase.from("areas").select("*"),
+    supabase.from("districts").select("*"),
+    supabase.from("deduction_item_defaults").select("label, sort_order"),
+  ]);
+
+  let imported = 0;
+  let skipped = 0;
+  for (const row of rows) {
+    const area = (areas ?? []).find((a) => a.name === row.area);
+    const contractTypeValid = (CONTRACT_TYPES as readonly string[]).includes(row.contract_type);
+    const payTypeValid = (PAY_TYPES as readonly string[]).includes(row.pay_type);
+    if (!area || !row.name || !row.contract_start_date || !contractTypeValid || !payTypeValid) {
+      skipped += 1;
+      continue;
+    }
+
+    const { data: driver, error: driverError } = await supabase
+      .from("drivers")
+      .insert({
+        name: row.name,
+        contract_type: row.contract_type,
+        area_id: area.id,
+        contract_start_date: row.contract_start_date,
+        phone: row.phone || null,
+        email: row.email || null,
+        pay_type: row.pay_type,
+      })
+      .select()
+      .single();
+    if (driverError || !driver) {
+      skipped += 1;
+      continue;
+    }
+
+    const districtNames = (row.districts ?? "")
+      .split("/")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    for (const districtName of districtNames) {
+      let district = (districts ?? []).find((d) => d.area_id === area.id && d.name === districtName);
+      if (!district) {
+        const { data: newDistrict } = await supabase
+          .from("districts")
+          .insert({ area_id: area.id, name: districtName })
+          .select()
+          .single();
+        if (newDistrict) {
+          district = newDistrict;
+          districts?.push(newDistrict);
+        }
+      }
+      if (district) {
+        await supabase.from("driver_districts").insert({ driver_id: driver.id, district_id: district.id });
+      }
+    }
+
+    // 管理費集計（6.4・6.5）の控除項目デフォルト7件をドライバー個別項目としてクローンする
+    // （単発作成のPOST /api/master/driversと同じ処理。CSV一括登録でも抜け漏れなく行う）
+    if (defaults && defaults.length > 0) {
+      await supabase.from("deduction_items").insert(
+        defaults.map((d) => ({ driver_id: driver.id, label: d.label, sort_order: d.sort_order }))
+      );
+    }
+
+    imported += 1;
+  }
+
+  await logOperation(supabase, {
+    action: "CSVインポート",
+    screenName: "マスタ管理(ドライバー)",
+    params: { count: imported, skipped },
+  });
+
+  return res.status(200).json({ imported, skipped });
+}
