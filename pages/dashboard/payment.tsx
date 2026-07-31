@@ -6,6 +6,7 @@ import CsvImportModal from "@/components/CsvImportModal";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import { getWeekRange } from "@/lib/date";
+import { PAY_TYPES } from "@/lib/constants";
 import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import type { PaymentNoticeDetail, PaymentNoticeRow, PaymentStatus } from "@/types/domain/payment";
 
@@ -25,7 +26,7 @@ export default function PaymentPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [payType, setPayType] = useState<"週払い" | "月払い">("週払い");
+  const [payType, setPayType] = useState<(typeof PAY_TYPES)[number]>("週払い");
   const [periodStart, setPeriodStart] = useState(() => getWeekRange(new Date()).start);
   const [periodEnd, setPeriodEnd] = useState(() => getWeekRange(new Date()).end);
 
@@ -38,7 +39,7 @@ export default function PaymentPage() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams();
+      const params = new URLSearchParams({ pay_type: payType });
       if (statusFilter !== "すべて") params.set("status", statusFilter);
       const res = await apiRequest<{ data: PaymentNoticeRow[] }>(`/api/payments?${params.toString()}`);
       setRows(res.data);
@@ -50,12 +51,12 @@ export default function PaymentPage() {
   }
 
   useEffect(() => {
-    // ステータス切替時に選択状態をリセットする意図的な副作用のため無効化する
+    // 支払種別・ステータス切替時に選択状態をリセットする意図的な副作用のため無効化する
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setChecked({});
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  }, [payType, statusFilter]);
 
   const allChecked = rows.length > 0 && rows.every((row) => checked[row.id]);
 
@@ -224,40 +225,42 @@ export default function PaymentPage() {
           </p>
         )}
 
-        <div className="panel" style={{ marginBottom: 22 }}>
-          <div className="panel__head">
-            <h3>対象期間から仮確定候補を生成</h3>
-          </div>
-          <div className="panel__body">
-            <div className="field-row">
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label htmlFor="pay-type">支払種別</label>
-                <select id="pay-type" value={payType} onChange={(e) => setPayType(e.target.value as typeof payType)}>
-                  <option value="週払い">週払い</option>
-                  <option value="月払い">月払い</option>
-                </select>
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label htmlFor="period-start">対象期間開始</label>
-                <input id="period-start" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label htmlFor="period-end">対象期間終了</label>
-                <input id="period-end" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
-              </div>
-              <div className="field" style={{ marginBottom: 0, alignSelf: "end" }}>
-                <button type="button" className="btn btn--ghost" onClick={handleGenerate} disabled={saving}>
-                  {saving ? "生成中..." : "生成する"}
-                </button>
-              </div>
-            </div>
-            <p className="text-sm text-muted" style={{ marginTop: 8 }}>
-              承認済みの件数集計データから未承認の支払通知書を生成します（既に生成済みのドライバーはスキップされます）。
-            </p>
-          </div>
+        <div className="tabbar" style={{ marginBottom: 22 }}>
+          {PAY_TYPES.map((tab) => (
+            <a
+              key={tab}
+              href="#"
+              className={tab === payType ? "is-active" : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                setPayType(tab);
+              }}
+            >
+              {tab}
+            </a>
+          ))}
         </div>
 
-        <div className="tabbar" style={{ marginBottom: 22 }}>
+        <div className="field-row" style={{ marginBottom: 22, alignItems: "flex-end" }}>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label htmlFor="period-start">対象期間開始</label>
+            <input id="period-start" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <label htmlFor="period-end">対象期間終了</label>
+            <input id="period-end" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
+          </div>
+          <div className="field" style={{ marginBottom: 0 }}>
+            <button type="button" className="btn btn--ghost" onClick={handleGenerate} disabled={saving}>
+              {saving ? "生成中..." : "生成する"}
+            </button>
+          </div>
+        </div>
+        <p className="text-sm text-muted" style={{ marginTop: -14, marginBottom: 22 }}>
+          承認済みの件数集計データから、上記の支払種別・対象期間で未承認の支払通知書を生成します（既に生成済みのドライバーはスキップされます）。
+        </p>
+
+        <div className="tabbar" style={{ marginBottom: 16 }}>
           {STATUS_TABS.map((tab) => (
             <a
               key={tab}
@@ -273,77 +276,62 @@ export default function PaymentPage() {
           ))}
         </div>
 
-        <div className="panel">
-          <div className="panel__head">
-            <h3>支払通知書一覧</h3>
-            <div className="flex" style={{ gap: 8 }}>
-              {selectedIds.length > 0 && statusFilter !== "確定" && (
+        <div className="flex" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h3 style={{ fontSize: 15 }}>支払通知書一覧</h3>
+          <div className="flex" style={{ gap: 8, alignItems: "center" }}>
+            <label className="text-sm flex" style={{ gap: 6, alignItems: "center" }}>
+              <input type="checkbox" checked={allChecked} onChange={toggleAll} disabled={rows.length === 0} />
+              すべて選択
+            </label>
+            {selectedIds.length > 0 && statusFilter !== "確定" && (
+              <button
+                type="button"
+                className="btn btn--sm"
+                onClick={statusFilter === "仮確定" ? handleConfirm : handleApprove}
+                disabled={saving}
+              >
+                選択した{selectedIds.length}件を{statusFilter === "仮確定" ? "確定" : "承認"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {!loading && rows.length === 0 && <p className="empty-note">該当する支払通知書はありません。</p>}
+
+        <div className="grid grid--3">
+          {rows.map((row) => (
+            <div className="panel" key={row.id}>
+              <div className="panel__head">
+                <label className="flex" style={{ gap: 8, alignItems: "center" }}>
+                  <input
+                    type="checkbox"
+                    checked={!!checked[row.id]}
+                    onChange={(event) => setChecked((prev) => ({ ...prev, [row.id]: event.target.checked }))}
+                  />
+                  <strong>{row.driverName}</strong>
+                </label>
+                <span className={`pill pill--${STATUS_TONE[row.status]}`}>{row.status}</span>
+              </div>
+              <div className="panel__body">
+                <p className="text-sm text-muted">{row.areaName ?? "-"}</p>
+                <p className="text-sm">
+                  {row.period_start}〜{row.period_end}
+                </p>
+                <p style={{ fontSize: 22, fontWeight: 900, fontFamily: "var(--font-mono)", marginTop: 8 }}>
+                  {row.amount.toLocaleString("ja-JP")}
+                  <small style={{ fontSize: 13, fontWeight: 700, marginLeft: 4 }}>円</small>
+                </p>
+                {row.remarks && <p className="text-sm text-muted">{row.remarks}</p>}
                 <button
-                  type="button"
-                  className="btn btn--sm"
-                  onClick={statusFilter === "仮確定" ? handleConfirm : handleApprove}
-                  disabled={saving}
+                  className="btn btn--sm btn--block"
+                  style={{ marginTop: 12 }}
+                  onClick={() => openDetail(row.id)}
                 >
-                  選択した{selectedIds.length}件を{statusFilter === "仮確定" ? "確定" : "承認"}
+                  詳細
                 </button>
-              )}
+              </div>
             </div>
-          </div>
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>
-                    <input type="checkbox" checked={allChecked} onChange={toggleAll} />
-                  </th>
-                  <th>ドライバー</th>
-                  <th>エリア</th>
-                  <th>支払種別</th>
-                  <th>対象期間</th>
-                  <th className="num">金額</th>
-                  <th>ステータス</th>
-                  <th>備考</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {!loading && rows.length === 0 && (
-                  <tr>
-                    <td colSpan={9}>
-                      <p className="empty-note">該当するステータスの支払通知書はありません。</p>
-                    </td>
-                  </tr>
-                )}
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <td>
-                      <input
-                        type="checkbox"
-                        checked={!!checked[row.id]}
-                        onChange={(event) => setChecked((prev) => ({ ...prev, [row.id]: event.target.checked }))}
-                      />
-                    </td>
-                    <td>{row.driverName}</td>
-                    <td>{row.areaName ?? "-"}</td>
-                    <td>{row.pay_type}</td>
-                    <td className="text-sm">
-                      {row.period_start}〜{row.period_end}
-                    </td>
-                    <td className="num">{row.amount.toLocaleString("ja-JP")}</td>
-                    <td>
-                      <span className={`pill pill--${STATUS_TONE[row.status]}`}>{row.status}</span>
-                    </td>
-                    <td className="text-sm text-muted">{row.remarks ?? ""}</td>
-                    <td>
-                      <button className="btn btn--sm" onClick={() => openDetail(row.id)}>
-                        詳細
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          ))}
         </div>
       </OperationLayout>
 
