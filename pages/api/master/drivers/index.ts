@@ -11,8 +11,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data, error } = await supabase
       .from("drivers")
       .select(
-        "*, area:areas(id, name), driver_districts(district:districts(id, name)), driver_documents(*)"
+        "*, area:areas(id, name), driver_districts(district:districts(id, name)), driver_documents(*, files:driver_document_files(*))"
       )
+      .eq("active", true)
       .order("created_at", { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ data });

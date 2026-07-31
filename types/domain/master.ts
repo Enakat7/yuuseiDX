@@ -17,7 +17,10 @@ export type CountCategory = Database["public"]["Tables"]["count_categories"]["Ro
 export type DocumentType = Database["public"]["Tables"]["document_types"]["Row"];
 export type Driver = Database["public"]["Tables"]["drivers"]["Row"];
 export type DriverDistrict = Database["public"]["Tables"]["driver_districts"]["Row"];
-export type DriverDocument = Database["public"]["Tables"]["driver_documents"]["Row"];
+export type DriverDocumentFile = Database["public"]["Tables"]["driver_document_files"]["Row"];
+export type DriverDocument = Database["public"]["Tables"]["driver_documents"]["Row"] & {
+  files: DriverDocumentFile[];
+};
 export type UnitPrice = Database["public"]["Tables"]["unit_prices"]["Row"];
 
 export type PriceKind = UnitPrice["price_kind"];

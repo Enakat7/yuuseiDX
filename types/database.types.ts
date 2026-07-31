@@ -429,6 +429,7 @@ export type Database = {
           is_expiring: boolean
           is_system: boolean
           label: string
+          max_files: number | null
           sort_order: number
           updated_at: string
         }
@@ -438,6 +439,7 @@ export type Database = {
           is_expiring?: boolean
           is_system?: boolean
           label: string
+          max_files?: number | null
           sort_order?: number
           updated_at?: string
         }
@@ -447,6 +449,7 @@ export type Database = {
           is_expiring?: boolean
           is_system?: boolean
           label?: string
+          max_files?: number | null
           sort_order?: number
           updated_at?: string
         }
@@ -482,39 +485,177 @@ export type Database = {
           },
         ]
       }
+      driver_document_files: {
+        Row: {
+          created_at: string
+          driver_document_id: string
+          id: string
+          original_filename: string
+          storage_path: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          driver_document_id: string
+          id?: string
+          original_filename: string
+          storage_path: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          driver_document_id?: string
+          id?: string
+          original_filename?: string
+          storage_path?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_document_files_driver_document_id_fkey"
+            columns: ["driver_document_id"]
+            isOneToOne: false
+            referencedRelation: "driver_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "driver_document_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_documents: {
         Row: {
+          cali_period_start: string | null
+          cali_policyholder_address: string | null
+          cali_policyholder_name: string | null
+          cali_registration_classification: string | null
+          cali_registration_number: string | null
+          cali_registration_place: string | null
+          cali_registration_usage: string | null
           created_at: string
           document_type_id: string
           driver_id: string
           expires_on: string | null
           id: string
-          original_filename: string
-          storage_path: string
+          insurance_coverage_bodily: string | null
+          insurance_coverage_cargo: string | null
+          insurance_coverage_personal: string | null
+          insurance_coverage_property: string | null
+          insurance_coverage_vehicle: string | null
+          insurance_driver_condition: string | null
+          insurance_insured_name: string | null
+          insurance_insured_vehicle: string | null
+          insurance_period_start: string | null
+          insurance_policy_number: string | null
+          insurance_vehicle_owner: string | null
+          license_address: string | null
+          license_birth_date: string | null
+          license_conditions: string | null
+          license_holder_name: string | null
+          license_issued_date: string | null
+          license_number: string | null
           updated_at: string
-          uploaded_by: string | null
+          vehicle_cert_base_location: string | null
+          vehicle_cert_chassis_number: string | null
+          vehicle_cert_displacement: string | null
+          vehicle_cert_max_load: string | null
+          vehicle_cert_model_name: string | null
+          vehicle_cert_number: string | null
+          vehicle_cert_owner_address: string | null
+          vehicle_cert_owner_name: string | null
+          vehicle_cert_purpose: string | null
+          vehicle_cert_type: string | null
+          vehicle_cert_usage: string | null
         }
         Insert: {
+          cali_period_start?: string | null
+          cali_policyholder_address?: string | null
+          cali_policyholder_name?: string | null
+          cali_registration_classification?: string | null
+          cali_registration_number?: string | null
+          cali_registration_place?: string | null
+          cali_registration_usage?: string | null
           created_at?: string
           document_type_id: string
           driver_id: string
           expires_on?: string | null
           id?: string
-          original_filename: string
-          storage_path: string
+          insurance_coverage_bodily?: string | null
+          insurance_coverage_cargo?: string | null
+          insurance_coverage_personal?: string | null
+          insurance_coverage_property?: string | null
+          insurance_coverage_vehicle?: string | null
+          insurance_driver_condition?: string | null
+          insurance_insured_name?: string | null
+          insurance_insured_vehicle?: string | null
+          insurance_period_start?: string | null
+          insurance_policy_number?: string | null
+          insurance_vehicle_owner?: string | null
+          license_address?: string | null
+          license_birth_date?: string | null
+          license_conditions?: string | null
+          license_holder_name?: string | null
+          license_issued_date?: string | null
+          license_number?: string | null
           updated_at?: string
-          uploaded_by?: string | null
+          vehicle_cert_base_location?: string | null
+          vehicle_cert_chassis_number?: string | null
+          vehicle_cert_displacement?: string | null
+          vehicle_cert_max_load?: string | null
+          vehicle_cert_model_name?: string | null
+          vehicle_cert_number?: string | null
+          vehicle_cert_owner_address?: string | null
+          vehicle_cert_owner_name?: string | null
+          vehicle_cert_purpose?: string | null
+          vehicle_cert_type?: string | null
+          vehicle_cert_usage?: string | null
         }
         Update: {
+          cali_period_start?: string | null
+          cali_policyholder_address?: string | null
+          cali_policyholder_name?: string | null
+          cali_registration_classification?: string | null
+          cali_registration_number?: string | null
+          cali_registration_place?: string | null
+          cali_registration_usage?: string | null
           created_at?: string
           document_type_id?: string
           driver_id?: string
           expires_on?: string | null
           id?: string
-          original_filename?: string
-          storage_path?: string
+          insurance_coverage_bodily?: string | null
+          insurance_coverage_cargo?: string | null
+          insurance_coverage_personal?: string | null
+          insurance_coverage_property?: string | null
+          insurance_coverage_vehicle?: string | null
+          insurance_driver_condition?: string | null
+          insurance_insured_name?: string | null
+          insurance_insured_vehicle?: string | null
+          insurance_period_start?: string | null
+          insurance_policy_number?: string | null
+          insurance_vehicle_owner?: string | null
+          license_address?: string | null
+          license_birth_date?: string | null
+          license_conditions?: string | null
+          license_holder_name?: string | null
+          license_issued_date?: string | null
+          license_number?: string | null
           updated_at?: string
-          uploaded_by?: string | null
+          vehicle_cert_base_location?: string | null
+          vehicle_cert_chassis_number?: string | null
+          vehicle_cert_displacement?: string | null
+          vehicle_cert_max_load?: string | null
+          vehicle_cert_model_name?: string | null
+          vehicle_cert_number?: string | null
+          vehicle_cert_owner_address?: string | null
+          vehicle_cert_owner_name?: string | null
+          vehicle_cert_purpose?: string | null
+          vehicle_cert_type?: string | null
+          vehicle_cert_usage?: string | null
         }
         Relationships: [
           {
@@ -529,13 +670,6 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "driver_documents_uploaded_by_fkey"
-            columns: ["uploaded_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -677,6 +811,30 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      login_lockouts: {
+        Row: {
+          fail_count: number
+          ip: string
+          lock_until: string | null
+          permanent: boolean
+          updated_at: string
+        }
+        Insert: {
+          fail_count?: number
+          ip: string
+          lock_until?: string | null
+          permanent?: boolean
+          updated_at?: string
+        }
+        Update: {
+          fail_count?: number
+          ip?: string
+          lock_until?: string | null
+          permanent?: boolean
+          updated_at?: string
+        }
+        Relationships: []
       }
       operation_logs: {
         Row: {

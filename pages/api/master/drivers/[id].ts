@@ -1,10 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { logOperation, requireStaffOrAdmin } from "@/lib/apiAuth";
+import { createAdminClient } from "@/lib/supabase/server";
 import { type DriverBody, validateDriverEnums } from "@/lib/driverFields";
 
+// Supabase Authのban_durationは有限期間しか指定できないため、実質恒久的な無効化として
+// 十分長い期間（約100年）を指定する。
+const PERMANENT_BAN_DURATION = "876000h";
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== "PATCH") {
-    res.setHeader("Allow", "PATCH");
+  if (req.method !== "PATCH" && req.method !== "DELETE") {
+    res.setHeader("Allow", "PATCH, DELETE");
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
@@ -15,6 +20,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const id = req.query.id;
   if (typeof id !== "string") {
     return res.status(400).json({ error: "idが不正です。" });
+  }
+
+  if (req.method === "DELETE") {
+    const { data: driver, error: driverError } = await supabase
+      .from("drivers")
+      .select("id, name, profile_id, active")
+      .eq("id", id)
+      .single();
+    if (driverError || !driver) return res.status(404).json({ error: "ドライバーが見つかりません。" });
+
+    if (!driver.active) {
+      return res.status(400).json({ error: "既に削除されています。" });
+    }
+
+    // ログインアカウントが発行済みの場合は、削除と同時にログインできないようにする
+    // （行そのものは外部キー制約（支払通知書・発注書・前払依頼書がRESTRICT）のため
+    // 物理削除できず、activeフラグによる論理削除とする）。
+    if (driver.profile_id) {
+      const admin = createAdminClient();
+      const { error: banError } = await admin.auth.admin.updateUserById(driver.profile_id, {
+        ban_duration: PERMANENT_BAN_DURATION,
+      });
+      if (banError) return res.status(500).json({ error: banError.message });
+    }
+
+    const { error: updateError } = await supabase.from("drivers").update({ active: false }).eq("id", id);
+    if (updateError) return res.status(500).json({ error: updateError.message });
+
+    await logOperation(supabase, {
+      action: "削除",
+      screenName: "マスタ管理(ドライバー)",
+      params: { name: driver.name },
+      targetTable: "drivers",
+      targetId: id,
+    });
+
+    return res.status(200).json({ data: { ok: true } });
   }
 
   const body = (req.body ?? {}) as DriverBody;

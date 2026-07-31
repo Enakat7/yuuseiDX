@@ -27,6 +27,7 @@ import type {
   DocumentType,
   Driver,
   DriverDocument,
+  DriverDocumentFile,
   DriverWithRelations,
   UnitPrice,
 } from "@/types/domain/master";
@@ -53,6 +54,36 @@ function cellKey(kind: string, areaId: string, deliveryTypeId: string) {
   return `${kind}:${areaId}:${deliveryTypeId}`;
 }
 
+const LICENSE_DOCUMENT_LABEL = "免許証";
+const VEHICLE_CERT_DOCUMENT_LABEL = "車検証";
+const INSURANCE_DOCUMENT_LABEL = "任意保険証";
+const CALI_DOCUMENT_LABEL = "自賠責保険証";
+
+// 令和・平成・昭和・大正・明治の元号表記（yy年mm月dd日）に変換する。
+// 開始日より前（明治以前）はISO表記のままフォールバックする。
+const JAPANESE_ERAS = [
+  { name: "令和", start: Date.UTC(2019, 4, 1) },
+  { name: "平成", start: Date.UTC(1989, 0, 8) },
+  { name: "昭和", start: Date.UTC(1926, 11, 25) },
+  { name: "大正", start: Date.UTC(1912, 6, 30) },
+  { name: "明治", start: Date.UTC(1868, 0, 25) },
+] as const;
+
+function formatJapaneseEraDate(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return iso;
+  const time = Date.UTC(y, m - 1, d);
+  for (const era of JAPANESE_ERAS) {
+    if (time >= era.start) {
+      const eraStartYear = new Date(era.start).getUTCFullYear();
+      const eraYear = y - eraStartYear + 1;
+      const yearLabel = eraYear === 1 ? "元" : String(eraYear).padStart(2, "0");
+      return `${era.name}${yearLabel}年${String(m).padStart(2, "0")}月${String(d).padStart(2, "0")}日`;
+    }
+  }
+  return iso;
+}
+
 type RawDriverRow = Driver & {
   area: { id: string; name: string } | null;
   driver_districts: { district: { id: string; name: string } | null }[];
@@ -65,7 +96,10 @@ function toDriverWithRelations(row: RawDriverRow): DriverWithRelations {
     ...driver,
     area,
     districts: driver_districts.map((dd) => dd.district).filter((d): d is { id: string; name: string } => !!d),
-    documents: driver_documents,
+    documents: driver_documents.map((doc) => ({
+      ...doc,
+      files: [...doc.files].sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    })),
   };
 }
 
@@ -757,6 +791,27 @@ export default function MasterDriverPage() {
   const [showAccountForm, setShowAccountForm] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
   const [passwordInput, setPasswordInput] = useState("");
+  const [licenseDraft, setLicenseDraft] = useState<LicenseFieldsDraft | null>(null);
+  const [vehicleCertDraft, setVehicleCertDraft] = useState<VehicleCertFieldsDraft | null>(null);
+  const [insuranceDraft, setInsuranceDraft] = useState<InsuranceFieldsDraft | null>(null);
+  const [caliDraft, setCaliDraft] = useState<CaliFieldsDraft | null>(null);
+
+  const licenseDocType = documentTypes.find((dt) => dt.label === LICENSE_DOCUMENT_LABEL);
+  const licenseDoc = licenseDocType
+    ? (detailDriver?.documents.find((d) => d.document_type_id === licenseDocType.id) ?? null)
+    : null;
+  const vehicleCertDocType = documentTypes.find((dt) => dt.label === VEHICLE_CERT_DOCUMENT_LABEL);
+  const vehicleCertDoc = vehicleCertDocType
+    ? (detailDriver?.documents.find((d) => d.document_type_id === vehicleCertDocType.id) ?? null)
+    : null;
+  const insuranceDocType = documentTypes.find((dt) => dt.label === INSURANCE_DOCUMENT_LABEL);
+  const insuranceDoc = insuranceDocType
+    ? (detailDriver?.documents.find((d) => d.document_type_id === insuranceDocType.id) ?? null)
+    : null;
+  const caliDocType = documentTypes.find((dt) => dt.label === CALI_DOCUMENT_LABEL);
+  const caliDoc = caliDocType
+    ? (detailDriver?.documents.find((d) => d.document_type_id === caliDocType.id) ?? null)
+    : null;
 
   async function loadAll() {
     setLoading(true);
@@ -854,12 +909,20 @@ export default function MasterDriverPage() {
   function handleStartEdit() {
     if (!detailDriver) return;
     setEditDraft(driverToFields(detailDriver));
+    setLicenseDraft(licenseDoc ? licenseDraftFromDoc(licenseDoc) : null);
+    setVehicleCertDraft(vehicleCertDoc ? vehicleCertDraftFromDoc(vehicleCertDoc) : null);
+    setInsuranceDraft(insuranceDoc ? insuranceDraftFromDoc(insuranceDoc) : null);
+    setCaliDraft(caliDoc ? caliDraftFromDoc(caliDoc) : null);
     setIsEditing(true);
   }
 
   function handleCancelEdit() {
     setIsEditing(false);
     setEditDraft(null);
+    setLicenseDraft(null);
+    setVehicleCertDraft(null);
+    setInsuranceDraft(null);
+    setCaliDraft(null);
   }
 
   async function handleSaveEdit() {
@@ -871,11 +934,61 @@ export default function MasterDriverPage() {
         method: "PATCH",
         body: JSON.stringify(fieldsToApiBody(editDraft)),
       });
+      if (licenseDoc && licenseDraft) {
+        await apiRequest(`/api/master/driver-documents/${licenseDoc.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(licenseDraftToApiBody(licenseDraft)),
+        });
+      }
+      if (vehicleCertDoc && vehicleCertDraft) {
+        await apiRequest(`/api/master/driver-documents/${vehicleCertDoc.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(vehicleCertDraftToApiBody(vehicleCertDraft)),
+        });
+      }
+      if (insuranceDoc && insuranceDraft) {
+        await apiRequest(`/api/master/driver-documents/${insuranceDoc.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(insuranceDraftToApiBody(insuranceDraft)),
+        });
+      }
+      if (caliDoc && caliDraft) {
+        await apiRequest(`/api/master/driver-documents/${caliDoc.id}`, {
+          method: "PATCH",
+          body: JSON.stringify(caliDraftToApiBody(caliDraft)),
+        });
+      }
       setIsEditing(false);
       setEditDraft(null);
+      setLicenseDraft(null);
+      setVehicleCertDraft(null);
+      setInsuranceDraft(null);
+      setCaliDraft(null);
       await loadAll();
     } catch (err) {
       setError(err instanceof Error ? err.message : "更新に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteDriver() {
+    if (!detailDriver) return;
+    if (
+      !window.confirm(
+        `${detailDriver.name}を削除します。よろしいですか？\n（ログインアカウントが発行済みの場合はログインもできなくなります。この操作は取り消せません。）`
+      )
+    ) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest(`/api/master/drivers/${detailDriver.id}`, { method: "DELETE" });
+      setDetailDriverId(null);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "削除に失敗しました。");
     } finally {
       setSaving(false);
     }
@@ -941,12 +1054,22 @@ export default function MasterDriverPage() {
     }
   }
 
-  async function handleViewDocument(doc: DriverDocument) {
+  async function fetchFileUrl(file: DriverDocumentFile): Promise<string> {
+    const { url } = await apiRequest<{ url: string }>(`/api/master/driver-document-files/${file.id}/signed-url`);
+    return url;
+  }
+
+  async function handleDeleteFile(file: DriverDocumentFile) {
+    if (!window.confirm("このファイルを削除します。よろしいですか？")) return;
+    setSaving(true);
+    setError(null);
     try {
-      const { url } = await apiRequest<{ url: string }>(`/api/master/driver-documents/${doc.id}/signed-url`);
-      window.open(url, "_blank", "noopener,noreferrer");
+      await apiRequest(`/api/master/driver-document-files/${file.id}`, { method: "DELETE" });
+      await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "表示用URLの発行に失敗しました。");
+      setError(err instanceof Error ? err.message : "削除に失敗しました。");
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -1016,6 +1139,22 @@ export default function MasterDriverPage() {
   }
 
   const editingFields = isEditing ? editDraft : detailDriver ? driverToFields(detailDriver) : null;
+  const licenseFieldsForDisplay = isEditing
+    ? licenseDraft
+    : licenseDoc
+      ? licenseDraftFromDoc(licenseDoc)
+      : null;
+  const vehicleCertFieldsForDisplay = isEditing
+    ? vehicleCertDraft
+    : vehicleCertDoc
+      ? vehicleCertDraftFromDoc(vehicleCertDoc)
+      : null;
+  const insuranceFieldsForDisplay = isEditing
+    ? insuranceDraft
+    : insuranceDoc
+      ? insuranceDraftFromDoc(insuranceDoc)
+      : null;
+  const caliFieldsForDisplay = isEditing ? caliDraft : caliDoc ? caliDraftFromDoc(caliDoc) : null;
 
   function updateEditDraft(patch: Partial<DriverFieldsDraft>) {
     setEditDraft((prev) => (prev ? { ...prev, ...patch } : prev));
@@ -1191,9 +1330,14 @@ export default function MasterDriverPage() {
                 </button>
               </div>
             ) : (
-              <button type="button" className="btn btn--ghost btn--sm" onClick={handleStartEdit}>
-                編集
-              </button>
+              <div className="flex" style={{ gap: 8 }}>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={handleDeleteDriver} disabled={saving}>
+                  削除
+                </button>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={handleStartEdit}>
+                  編集
+                </button>
+              </div>
             )
           }
         >
@@ -1315,7 +1459,17 @@ export default function MasterDriverPage() {
               driver={detailDriver}
               saving={saving}
               onUpload={handleUpload}
-              onView={handleViewDocument}
+              getUrl={fetchFileUrl}
+              onDeleteFile={handleDeleteFile}
+              isEditing={isEditing}
+              licenseDraft={licenseFieldsForDisplay}
+              onLicenseChange={(patch) => setLicenseDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
+              vehicleCertDraft={vehicleCertFieldsForDisplay}
+              onVehicleCertChange={(patch) => setVehicleCertDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
+              insuranceDraft={insuranceFieldsForDisplay}
+              onInsuranceChange={(patch) => setInsuranceDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
+              caliDraft={caliFieldsForDisplay}
+              onCaliChange={(patch) => setCaliDraft((prev) => (prev ? { ...prev, ...patch } : prev))}
             />
           )}
           </div>
@@ -1325,6 +1479,8 @@ export default function MasterDriverPage() {
   );
 }
 
+const IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "webp", "gif"];
+
 function DocumentCarousel({
   documentTypes,
   docIndex,
@@ -1332,18 +1488,77 @@ function DocumentCarousel({
   driver,
   saving,
   onUpload,
-  onView,
+  getUrl,
+  onDeleteFile,
+  isEditing,
+  licenseDraft,
+  onLicenseChange,
+  vehicleCertDraft,
+  onVehicleCertChange,
+  insuranceDraft,
+  onInsuranceChange,
+  caliDraft,
+  onCaliChange,
 }: {
   documentTypes: DocumentType[];
   docIndex: number;
   setDocIndex: (updater: (prev: number) => number) => void;
   driver: DriverWithRelations;
   saving: boolean;
-  onUpload: (driver: DriverWithRelations, docType: DocumentType, file: File, expiresOn: string) => void;
-  onView: (doc: DriverDocument) => void;
+  onUpload: (driver: DriverWithRelations, docType: DocumentType, file: File, expiresOn: string) => Promise<void>;
+  getUrl: (file: DriverDocumentFile) => Promise<string>;
+  onDeleteFile: (file: DriverDocumentFile) => Promise<void>;
+  isEditing: boolean;
+  licenseDraft: LicenseFieldsDraft | null;
+  onLicenseChange: (patch: Partial<LicenseFieldsDraft>) => void;
+  vehicleCertDraft: VehicleCertFieldsDraft | null;
+  onVehicleCertChange: (patch: Partial<VehicleCertFieldsDraft>) => void;
+  insuranceDraft: InsuranceFieldsDraft | null;
+  onInsuranceChange: (patch: Partial<InsuranceFieldsDraft>) => void;
+  caliDraft: CaliFieldsDraft | null;
+  onCaliChange: (patch: Partial<CaliFieldsDraft>) => void;
 }) {
   const docType = documentTypes[docIndex];
   const doc = driver.documents.find((d) => d.document_type_id === docType.id);
+  const files = doc?.files ?? [];
+  const [fileIndex, setFileIndex] = useState(0);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // 表示中の書類種別を切り替えるたびにファイルカルーセルの位置をリセットする
+    // 意図的な副作用のため無効化する
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setFileIndex(0);
+  }, [docIndex]);
+
+  const safeFileIndex = files.length > 0 ? Math.min(fileIndex, files.length - 1) : 0;
+  const currentFile = files[safeFileIndex] ?? null;
+
+  useEffect(() => {
+    // 表示中のファイルが変わるたびに署名付きURLを取り直す意図的な副作用のため無効化する
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPreviewUrl(null);
+    setPreviewError(null);
+    if (!currentFile) return;
+    let cancelled = false;
+    getUrl(currentFile)
+      .then((url) => {
+        if (!cancelled) setPreviewUrl(url);
+      })
+      .catch((err) => {
+        if (!cancelled) setPreviewError(err instanceof Error ? err.message : "表示に失敗しました。");
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentFile?.id, currentFile?.storage_path]);
+
+  const extension = currentFile?.original_filename.split(".").pop()?.toLowerCase() ?? "";
+  const isImage = IMAGE_EXTENSIONS.includes(extension);
+  const isPdf = extension === "pdf";
+  const atMaxFiles = docType.max_files !== null && files.length >= docType.max_files;
 
   return (
     <div>
@@ -1371,20 +1586,756 @@ function DocumentCarousel({
         </div>
       </div>
 
-      <div style={{ maxWidth: 420, margin: "0 auto", textAlign: "center" }}>
-        {doc ? (
-          <button type="button" className="tag" style={{ cursor: "pointer", fontSize: 13 }} onClick={() => onView(doc)}>
-            {docType.label}
-            {doc.expires_on && `（期限：${doc.expires_on}）`}
-          </button>
+      <div className="grid grid--2">
+        <div style={{ maxHeight: 480, overflowY: "auto", paddingRight: 8 }}>
+          <p className="section-title">{docType.label}</p>
+          {doc ? (
+            <>
+              <p className="text-sm">
+                <strong>提出状況：</strong>
+                <span className="pill pill--confirmed" style={{ marginLeft: 6 }}>
+                  提出済み
+                </span>
+                <span className="text-sm text-muted" style={{ marginLeft: 8 }}>
+                  {files.length}
+                  {docType.max_files !== null ? `／${docType.max_files}` : ""}枚
+                </span>
+              </p>
+              {docType.label !== LICENSE_DOCUMENT_LABEL &&
+                docType.label !== VEHICLE_CERT_DOCUMENT_LABEL &&
+                docType.label !== INSURANCE_DOCUMENT_LABEL &&
+                docType.label !== CALI_DOCUMENT_LABEL && (
+                  <p className="text-sm">
+                    <strong>有効期限：</strong>
+                    {doc.expires_on ?? (docType.is_expiring ? "未設定" : "期限なし")}
+                  </p>
+                )}
+              {docType.label === LICENSE_DOCUMENT_LABEL && licenseDraft && (
+                <LicenseDetails editing={isEditing} draft={licenseDraft} onChange={onLicenseChange} />
+              )}
+              {docType.label === VEHICLE_CERT_DOCUMENT_LABEL && vehicleCertDraft && (
+                <VehicleCertDetails editing={isEditing} draft={vehicleCertDraft} onChange={onVehicleCertChange} />
+              )}
+              {docType.label === INSURANCE_DOCUMENT_LABEL && insuranceDraft && (
+                <InsuranceDetails editing={isEditing} draft={insuranceDraft} onChange={onInsuranceChange} />
+              )}
+              {docType.label === CALI_DOCUMENT_LABEL && caliDraft && (
+                <CaliDetails editing={isEditing} draft={caliDraft} onChange={onCaliChange} />
+              )}
+            </>
+          ) : (
+            <>
+              <p className="text-sm" style={{ marginBottom: 12 }}>
+                <strong>提出状況：</strong>
+                <span className="pill pill--pending" style={{ marginLeft: 6 }}>
+                  未提出
+                </span>
+              </p>
+              <DocumentUploadRow
+                docType={docType}
+                disabled={saving}
+                onUpload={(file, expiresOn) => onUpload(driver, docType, file, expiresOn)}
+              />
+            </>
+          )}
+        </div>
+
+        <div style={{ textAlign: "center" }}>
+          {!doc && <p className="text-sm text-muted">未提出</p>}
+
+          {doc && (
+            <>
+              {files.length > 1 && (
+                <div className="flex" style={{ justifyContent: "center", marginBottom: 12 }}>
+                  <div className="date-nav">
+                    <button
+                      type="button"
+                      className="date-nav__btn"
+                      aria-label="前のファイル"
+                      onClick={() => setFileIndex((i) => (i - 1 + files.length) % files.length)}
+                    >
+                      ‹
+                    </button>
+                    <span className="date-nav__value">
+                      {safeFileIndex + 1}/{files.length}
+                    </span>
+                    <button
+                      type="button"
+                      className="date-nav__btn"
+                      aria-label="次のファイル"
+                      onClick={() => setFileIndex((i) => (i + 1) % files.length)}
+                    >
+                      ›
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {previewError && (
+                <p className="text-sm" style={{ color: "var(--black)" }}>
+                  {previewError}
+                </p>
+              )}
+
+              {!previewError && !previewUrl && <p className="text-sm text-muted">読み込み中...</p>}
+
+              {previewUrl && isImage && (
+                <a href={previewUrl} target="_blank" rel="noopener noreferrer">
+                  {/* Supabaseの署名付きURL（短時間で失効・毎回変動）のためnext/imageの最適化対象にできない */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={previewUrl}
+                    alt={docType.label}
+                    style={{ maxWidth: "100%", maxHeight: 420, border: "var(--border-w-sm) solid var(--black)" }}
+                  />
+                </a>
+              )}
+
+              {previewUrl && isPdf && (
+                <iframe
+                  src={previewUrl}
+                  title={docType.label}
+                  style={{ width: "100%", height: 420, border: "var(--border-w-sm) solid var(--black)" }}
+                />
+              )}
+
+              {previewUrl && !isImage && !isPdf && (
+                <a
+                  href={previewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tag"
+                  style={{ cursor: "pointer", fontSize: 13 }}
+                >
+                  {docType.label}を開く
+                </a>
+              )}
+
+              {currentFile && (
+                <p className="text-sm text-muted" style={{ marginTop: 8 }}>
+                  {currentFile.original_filename}
+                </p>
+              )}
+
+              {currentFile && (
+                <div style={{ marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    disabled={saving}
+                    onClick={() => onDeleteFile(currentFile)}
+                  >
+                    このファイルを削除
+                  </button>
+                </div>
+              )}
+
+              {!atMaxFiles && (
+                <div style={{ marginTop: 16 }}>
+                  <DocumentUploadRow
+                    docType={docType}
+                    disabled={saving}
+                    label="ファイルを追加"
+                    captureExpiresOn={false}
+                    onUpload={(file, expiresOn) => onUpload(driver, docType, file, expiresOn)}
+                  />
+                </div>
+              )}
+
+              {atMaxFiles && (
+                <p className="text-sm text-muted" style={{ marginTop: 16 }}>
+                  アップロード上限（{docType.max_files}枚）に達しています。
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type LicenseFieldsDraft = {
+  holderName: string;
+  birthDate: string;
+  address: string;
+  issuedDate: string;
+  expiresOn: string;
+  conditions: string;
+  licenseNumber: string;
+};
+
+function licenseDraftFromDoc(doc: DriverDocument): LicenseFieldsDraft {
+  return {
+    holderName: doc.license_holder_name ?? "",
+    birthDate: doc.license_birth_date ?? "",
+    address: doc.license_address ?? "",
+    issuedDate: doc.license_issued_date ?? "",
+    expiresOn: doc.expires_on ?? "",
+    conditions: doc.license_conditions ?? "",
+    licenseNumber: doc.license_number ?? "",
+  };
+}
+
+function licenseDraftToApiBody(fields: LicenseFieldsDraft) {
+  return {
+    license_holder_name: fields.holderName || null,
+    license_birth_date: fields.birthDate || null,
+    license_address: fields.address || null,
+    license_issued_date: fields.issuedDate || null,
+    expires_on: fields.expiresOn || null,
+    license_conditions: fields.conditions || null,
+    license_number: fields.licenseNumber || null,
+  };
+}
+
+function LicenseDateField({
+  id,
+  label,
+  value,
+  editing,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  editing: boolean;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="field" style={{ marginBottom: 12 }}>
+      <label htmlFor={id}>{label}</label>
+      {editing ? (
+        <input id={id} type="date" value={value} onChange={(e) => onChange(e.target.value)} />
+      ) : (
+        <p className="text-sm">{value ? formatJapaneseEraDate(value) : "-"}</p>
+      )}
+    </div>
+  );
+}
+
+function LicenseDetails({
+  editing,
+  draft,
+  onChange,
+}: {
+  editing: boolean;
+  draft: LicenseFieldsDraft;
+  onChange: (patch: Partial<LicenseFieldsDraft>) => void;
+}) {
+  return (
+    <div style={{ marginTop: 16 }}>
+      <p className="section-title">記載事項</p>
+
+      <ViewOrInput
+        id="license-holder-name"
+        label="氏名"
+        value={draft.holderName}
+        editing={editing}
+        onChange={(v) => onChange({ holderName: v })}
+      />
+      <LicenseDateField
+        id="license-birth-date"
+        label="生年月日"
+        value={draft.birthDate}
+        editing={editing}
+        onChange={(v) => onChange({ birthDate: v })}
+      />
+      <ViewOrInput
+        id="license-address"
+        label="住所"
+        value={draft.address}
+        editing={editing}
+        onChange={(v) => onChange({ address: v })}
+      />
+      <LicenseDateField
+        id="license-issued-date"
+        label="交付日"
+        value={draft.issuedDate}
+        editing={editing}
+        onChange={(v) => onChange({ issuedDate: v })}
+      />
+      <LicenseDateField
+        id="license-expires-on"
+        label="有効期限"
+        value={draft.expiresOn}
+        editing={editing}
+        onChange={(v) => onChange({ expiresOn: v })}
+      />
+      <ViewOrInput
+        id="license-conditions"
+        label="条件等"
+        type="textarea"
+        value={draft.conditions}
+        editing={editing}
+        onChange={(v) => onChange({ conditions: v })}
+      />
+      <div className="field" style={{ marginBottom: 12 }}>
+        <label htmlFor="license-number">番号</label>
+        {editing ? (
+          <div className="flex" style={{ gap: 6, alignItems: "center" }}>
+            <span className="text-sm">第</span>
+            <input
+              id="license-number"
+              type="text"
+              value={draft.licenseNumber}
+              onChange={(e) => onChange({ licenseNumber: e.target.value })}
+            />
+            <span className="text-sm">号</span>
+          </div>
         ) : (
-          <DocumentUploadRow
-            docType={docType}
-            disabled={saving}
-            onUpload={(file, expiresOn) => onUpload(driver, docType, file, expiresOn)}
-          />
+          <p className="text-sm">{draft.licenseNumber ? `第 ${draft.licenseNumber} 号` : "-"}</p>
         )}
       </div>
+    </div>
+  );
+}
+
+type VehicleCertFieldsDraft = {
+  vehicleNumber: string;
+  vehicleType: string;
+  purpose: string;
+  usage: string;
+  modelName: string;
+  maxLoad: string;
+  chassisNumber: string;
+  displacement: string;
+  ownerName: string;
+  ownerAddress: string;
+  baseLocation: string;
+  expiresOn: string;
+};
+
+function vehicleCertDraftFromDoc(doc: DriverDocument): VehicleCertFieldsDraft {
+  return {
+    vehicleNumber: doc.vehicle_cert_number ?? "",
+    vehicleType: doc.vehicle_cert_type ?? "",
+    purpose: doc.vehicle_cert_purpose ?? "",
+    usage: doc.vehicle_cert_usage ?? "",
+    modelName: doc.vehicle_cert_model_name ?? "",
+    maxLoad: doc.vehicle_cert_max_load ?? "",
+    chassisNumber: doc.vehicle_cert_chassis_number ?? "",
+    displacement: doc.vehicle_cert_displacement ?? "",
+    ownerName: doc.vehicle_cert_owner_name ?? "",
+    ownerAddress: doc.vehicle_cert_owner_address ?? "",
+    baseLocation: doc.vehicle_cert_base_location ?? "",
+    expiresOn: doc.expires_on ?? "",
+  };
+}
+
+function vehicleCertDraftToApiBody(fields: VehicleCertFieldsDraft) {
+  return {
+    vehicle_cert_number: fields.vehicleNumber || null,
+    vehicle_cert_type: fields.vehicleType || null,
+    vehicle_cert_purpose: fields.purpose || null,
+    vehicle_cert_usage: fields.usage || null,
+    vehicle_cert_model_name: fields.modelName || null,
+    vehicle_cert_max_load: fields.maxLoad || null,
+    vehicle_cert_chassis_number: fields.chassisNumber || null,
+    vehicle_cert_displacement: fields.displacement || null,
+    vehicle_cert_owner_name: fields.ownerName || null,
+    vehicle_cert_owner_address: fields.ownerAddress || null,
+    vehicle_cert_base_location: fields.baseLocation || null,
+    expires_on: fields.expiresOn || null,
+  };
+}
+
+function VehicleCertDetails({
+  editing,
+  draft,
+  onChange,
+}: {
+  editing: boolean;
+  draft: VehicleCertFieldsDraft;
+  onChange: (patch: Partial<VehicleCertFieldsDraft>) => void;
+}) {
+  return (
+    <div style={{ marginTop: 16 }}>
+      <p className="section-title">記載事項</p>
+
+      <ViewOrInput
+        id="vehicle-cert-number"
+        label="車両番号"
+        value={draft.vehicleNumber}
+        editing={editing}
+        onChange={(v) => onChange({ vehicleNumber: v })}
+      />
+      <ViewOrInput
+        id="vehicle-cert-type"
+        label="自動車の種別"
+        value={draft.vehicleType}
+        editing={editing}
+        onChange={(v) => onChange({ vehicleType: v })}
+      />
+      <ViewOrInput
+        id="vehicle-cert-purpose"
+        label="用途"
+        value={draft.purpose}
+        editing={editing}
+        onChange={(v) => onChange({ purpose: v })}
+      />
+      <ViewOrInput
+        id="vehicle-cert-usage"
+        label="自家用･事業用の別"
+        value={draft.usage}
+        editing={editing}
+        onChange={(v) => onChange({ usage: v })}
+      />
+      <ViewOrInput
+        id="vehicle-cert-model-name"
+        label="車名"
+        value={draft.modelName}
+        editing={editing}
+        onChange={(v) => onChange({ modelName: v })}
+      />
+      <ViewOrInput
+        id="vehicle-cert-max-load"
+        label="最大積載量"
+        value={draft.maxLoad}
+        editing={editing}
+        onChange={(v) => onChange({ maxLoad: v })}
+      />
+      <ViewOrInput
+        id="vehicle-cert-chassis-number"
+        label="車体番号"
+        value={draft.chassisNumber}
+        editing={editing}
+        onChange={(v) => onChange({ chassisNumber: v })}
+      />
+      <ViewOrInput
+        id="vehicle-cert-displacement"
+        label="総排気量"
+        value={draft.displacement}
+        editing={editing}
+        onChange={(v) => onChange({ displacement: v })}
+      />
+      <ViewOrInput
+        id="vehicle-cert-owner-name"
+        label="使用者の氏名又は名称"
+        value={draft.ownerName}
+        editing={editing}
+        onChange={(v) => onChange({ ownerName: v })}
+      />
+      <ViewOrInput
+        id="vehicle-cert-owner-address"
+        label="使用者の住所"
+        value={draft.ownerAddress}
+        editing={editing}
+        onChange={(v) => onChange({ ownerAddress: v })}
+      />
+      <ViewOrInput
+        id="vehicle-cert-base-location"
+        label="使用の本拠の位置"
+        value={draft.baseLocation}
+        editing={editing}
+        onChange={(v) => onChange({ baseLocation: v })}
+      />
+      <LicenseDateField
+        id="vehicle-cert-expires-on"
+        label="有効期間の満了する日"
+        value={draft.expiresOn}
+        editing={editing}
+        onChange={(v) => onChange({ expiresOn: v })}
+      />
+    </div>
+  );
+}
+
+type InsuranceFieldsDraft = {
+  policyNumber: string;
+  periodStart: string;
+  periodEnd: string;
+  insuredName: string;
+  vehicleOwner: string;
+  driverCondition: string;
+  insuredVehicle: string;
+  coverageBodily: string;
+  coverageProperty: string;
+  coveragePersonal: string;
+  coverageVehicle: string;
+  coverageCargo: string;
+};
+
+function insuranceDraftFromDoc(doc: DriverDocument): InsuranceFieldsDraft {
+  return {
+    policyNumber: doc.insurance_policy_number ?? "",
+    periodStart: doc.insurance_period_start ?? "",
+    periodEnd: doc.expires_on ?? "",
+    insuredName: doc.insurance_insured_name ?? "",
+    vehicleOwner: doc.insurance_vehicle_owner ?? "",
+    driverCondition: doc.insurance_driver_condition ?? "",
+    insuredVehicle: doc.insurance_insured_vehicle ?? "",
+    coverageBodily: doc.insurance_coverage_bodily ?? "",
+    coverageProperty: doc.insurance_coverage_property ?? "",
+    coveragePersonal: doc.insurance_coverage_personal ?? "",
+    coverageVehicle: doc.insurance_coverage_vehicle ?? "",
+    coverageCargo: doc.insurance_coverage_cargo ?? "",
+  };
+}
+
+function insuranceDraftToApiBody(fields: InsuranceFieldsDraft) {
+  return {
+    insurance_policy_number: fields.policyNumber || null,
+    insurance_period_start: fields.periodStart || null,
+    expires_on: fields.periodEnd || null,
+    insurance_insured_name: fields.insuredName || null,
+    insurance_vehicle_owner: fields.vehicleOwner || null,
+    insurance_driver_condition: fields.driverCondition || null,
+    insurance_insured_vehicle: fields.insuredVehicle || null,
+    insurance_coverage_bodily: fields.coverageBodily || null,
+    insurance_coverage_property: fields.coverageProperty || null,
+    insurance_coverage_personal: fields.coveragePersonal || null,
+    insurance_coverage_vehicle: fields.coverageVehicle || null,
+    insurance_coverage_cargo: fields.coverageCargo || null,
+  };
+}
+
+function InsurancePeriodField({
+  startValue,
+  endValue,
+  editing,
+  onChangeStart,
+  onChangeEnd,
+}: {
+  startValue: string;
+  endValue: string;
+  editing: boolean;
+  onChangeStart: (value: string) => void;
+  onChangeEnd: (value: string) => void;
+}) {
+  return (
+    <div className="field" style={{ marginBottom: 12 }}>
+      <label htmlFor="insurance-period-start">保険期間</label>
+      {editing ? (
+        <div className="flex" style={{ gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            id="insurance-period-start"
+            type="date"
+            value={startValue}
+            onChange={(e) => onChangeStart(e.target.value)}
+          />
+          <span className="text-sm">から</span>
+          <input
+            id="insurance-period-end"
+            type="date"
+            value={endValue}
+            onChange={(e) => onChangeEnd(e.target.value)}
+          />
+          <span className="text-sm">まで</span>
+        </div>
+      ) : (
+        <p className="text-sm">
+          {startValue || endValue
+            ? `${startValue ? formatJapaneseEraDate(startValue) : "-"} から ${
+                endValue ? formatJapaneseEraDate(endValue) : "-"
+              } まで`
+            : "-"}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function InsuranceDetails({
+  editing,
+  draft,
+  onChange,
+}: {
+  editing: boolean;
+  draft: InsuranceFieldsDraft;
+  onChange: (patch: Partial<InsuranceFieldsDraft>) => void;
+}) {
+  return (
+    <div style={{ marginTop: 16 }}>
+      <p className="section-title">記載事項</p>
+
+      <ViewOrInput
+        id="insurance-policy-number"
+        label="証券番号"
+        value={draft.policyNumber}
+        editing={editing}
+        onChange={(v) => onChange({ policyNumber: v })}
+      />
+      <InsurancePeriodField
+        startValue={draft.periodStart}
+        endValue={draft.periodEnd}
+        editing={editing}
+        onChangeStart={(v) => onChange({ periodStart: v })}
+        onChangeEnd={(v) => onChange({ periodEnd: v })}
+      />
+      <ViewOrInput
+        id="insurance-insured-name"
+        label="記名被保険者"
+        value={draft.insuredName}
+        editing={editing}
+        onChange={(v) => onChange({ insuredName: v })}
+      />
+      <ViewOrInput
+        id="insurance-vehicle-owner"
+        label="車両保有者"
+        value={draft.vehicleOwner}
+        editing={editing}
+        onChange={(v) => onChange({ vehicleOwner: v })}
+      />
+      <ViewOrInput
+        id="insurance-driver-condition"
+        label="運転者の条件"
+        value={draft.driverCondition}
+        editing={editing}
+        onChange={(v) => onChange({ driverCondition: v })}
+      />
+      <ViewOrInput
+        id="insurance-insured-vehicle"
+        label="被保険自動車"
+        value={draft.insuredVehicle}
+        editing={editing}
+        onChange={(v) => onChange({ insuredVehicle: v })}
+      />
+      <ViewOrInput
+        id="insurance-coverage-bodily"
+        label="保障内容(対人)"
+        value={draft.coverageBodily}
+        editing={editing}
+        onChange={(v) => onChange({ coverageBodily: v })}
+      />
+      <ViewOrInput
+        id="insurance-coverage-property"
+        label="保障内容(対物)"
+        value={draft.coverageProperty}
+        editing={editing}
+        onChange={(v) => onChange({ coverageProperty: v })}
+      />
+      <ViewOrInput
+        id="insurance-coverage-personal"
+        label="保障内容(自身)"
+        value={draft.coveragePersonal}
+        editing={editing}
+        onChange={(v) => onChange({ coveragePersonal: v })}
+      />
+      <ViewOrInput
+        id="insurance-coverage-vehicle"
+        label="保障内容(車)"
+        value={draft.coverageVehicle}
+        editing={editing}
+        onChange={(v) => onChange({ coverageVehicle: v })}
+      />
+      <ViewOrInput
+        id="insurance-coverage-cargo"
+        label="保障内容(荷物)"
+        value={draft.coverageCargo}
+        editing={editing}
+        onChange={(v) => onChange({ coverageCargo: v })}
+      />
+    </div>
+  );
+}
+
+type CaliFieldsDraft = {
+  registrationPlace: string;
+  registrationClassification: string;
+  registrationUsage: string;
+  registrationNumber: string;
+  periodStart: string;
+  periodEnd: string;
+  policyholderAddress: string;
+  policyholderName: string;
+};
+
+function caliDraftFromDoc(doc: DriverDocument): CaliFieldsDraft {
+  return {
+    registrationPlace: doc.cali_registration_place ?? "",
+    registrationClassification: doc.cali_registration_classification ?? "",
+    registrationUsage: doc.cali_registration_usage ?? "",
+    registrationNumber: doc.cali_registration_number ?? "",
+    periodStart: doc.cali_period_start ?? "",
+    periodEnd: doc.expires_on ?? "",
+    policyholderAddress: doc.cali_policyholder_address ?? "",
+    policyholderName: doc.cali_policyholder_name ?? "",
+  };
+}
+
+function caliDraftToApiBody(fields: CaliFieldsDraft) {
+  return {
+    cali_registration_place: fields.registrationPlace || null,
+    cali_registration_classification: fields.registrationClassification || null,
+    cali_registration_usage: fields.registrationUsage || null,
+    cali_registration_number: fields.registrationNumber || null,
+    cali_period_start: fields.periodStart || null,
+    expires_on: fields.periodEnd || null,
+    cali_policyholder_address: fields.policyholderAddress || null,
+    cali_policyholder_name: fields.policyholderName || null,
+  };
+}
+
+function CaliDetails({
+  editing,
+  draft,
+  onChange,
+}: {
+  editing: boolean;
+  draft: CaliFieldsDraft;
+  onChange: (patch: Partial<CaliFieldsDraft>) => void;
+}) {
+  return (
+    <div style={{ marginTop: 16 }}>
+      <p className="section-title">記載事項</p>
+
+      <ViewOrInput
+        id="cali-registration-place"
+        label="自動車登録番号(地名)"
+        value={draft.registrationPlace}
+        editing={editing}
+        onChange={(v) => onChange({ registrationPlace: v })}
+      />
+      <ViewOrInput
+        id="cali-registration-classification"
+        label="自動車登録番号(分類番号)"
+        value={draft.registrationClassification}
+        editing={editing}
+        onChange={(v) => onChange({ registrationClassification: v })}
+      />
+      <ViewOrInput
+        id="cali-registration-usage"
+        label="自動車登録番号(用途を表す文字)"
+        value={draft.registrationUsage}
+        editing={editing}
+        onChange={(v) => onChange({ registrationUsage: v })}
+      />
+      <ViewOrInput
+        id="cali-registration-number"
+        label="自動車登録番号(指定番号)"
+        value={draft.registrationNumber}
+        editing={editing}
+        onChange={(v) => onChange({ registrationNumber: v })}
+      />
+      <LicenseDateField
+        id="cali-period-start"
+        label="保険期間(自)"
+        value={draft.periodStart}
+        editing={editing}
+        onChange={(v) => onChange({ periodStart: v })}
+      />
+      <LicenseDateField
+        id="cali-period-end"
+        label="保険期間(至)"
+        value={draft.periodEnd}
+        editing={editing}
+        onChange={(v) => onChange({ periodEnd: v })}
+      />
+      <ViewOrInput
+        id="cali-policyholder-address"
+        label="保険契約者(住所)"
+        value={draft.policyholderAddress}
+        editing={editing}
+        onChange={(v) => onChange({ policyholderAddress: v })}
+      />
+      <ViewOrInput
+        id="cali-policyholder-name"
+        label="保険契約者(氏名)"
+        value={draft.policyholderName}
+        editing={editing}
+        onChange={(v) => onChange({ policyholderName: v })}
+      />
     </div>
   );
 }
@@ -1392,10 +2343,14 @@ function DocumentCarousel({
 function DocumentUploadRow({
   docType,
   disabled,
+  label = "未提出",
+  captureExpiresOn = true,
   onUpload,
 }: {
   docType: DocumentType;
   disabled: boolean;
+  label?: string;
+  captureExpiresOn?: boolean;
   onUpload: (file: File, expiresOn: string) => void;
 }) {
   const [expiresOn, setExpiresOn] = useState("");
@@ -1403,9 +2358,9 @@ function DocumentUploadRow({
   return (
     <div className="flex" style={{ gap: 8, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
       <span className="tag" style={{ borderStyle: "dashed", color: "var(--gray-400)" }}>
-        未提出
+        {label}
       </span>
-      {docType.is_expiring && (
+      {docType.is_expiring && captureExpiresOn && (
         <input
           type="date"
           style={{ width: 150 }}

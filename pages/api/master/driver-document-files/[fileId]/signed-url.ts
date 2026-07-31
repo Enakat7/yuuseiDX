@@ -11,21 +11,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!auth) return;
   const { supabase } = auth;
 
-  const id = req.query.id;
-  if (typeof id !== "string") {
-    return res.status(400).json({ error: "idが不正です。" });
+  const fileId = req.query.fileId;
+  if (typeof fileId !== "string") {
+    return res.status(400).json({ error: "fileIdが不正です。" });
   }
 
-  const { data: doc, error: docError } = await supabase
-    .from("driver_documents")
+  const { data: file, error: fileError } = await supabase
+    .from("driver_document_files")
     .select("storage_path")
-    .eq("id", id)
+    .eq("id", fileId)
     .single();
-  if (docError || !doc) return res.status(404).json({ error: "書類が見つかりません。" });
+  if (fileError || !file) return res.status(404).json({ error: "ファイルが見つかりません。" });
 
   const { data, error } = await supabase.storage
     .from("driver-documents")
-    .createSignedUrl(doc.storage_path, 60);
+    .createSignedUrl(file.storage_path, 60);
   if (error || !data) return res.status(500).json({ error: error?.message ?? "URLの発行に失敗しました。" });
 
   return res.status(200).json({ url: data.signedUrl });
