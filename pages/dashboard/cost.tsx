@@ -83,13 +83,20 @@ export default function CostPage() {
     setSaving(true);
     setError(null);
     try {
+      // 他の利用者が同時に編集している場合に触っていないセルまで上書きしてしまわないよう、
+      // 読み込み時点の値（rows）から実際に変更されたセルのみを送信する。
       const entries = rows.flatMap((row) =>
-        row.items.map((item) => ({ item_id: item.itemId, amount: Number(draft[item.itemId]) || 0 }))
+        row.items
+          .map((item) => ({ item_id: item.itemId, amount: Number(draft[item.itemId]) || 0, original: item.amount }))
+          .filter((entry) => entry.amount !== entry.original)
+          .map(({ item_id, amount }) => ({ item_id, amount }))
       );
-      await apiRequest("/api/cost/amounts", {
-        method: "POST",
-        body: JSON.stringify({ period_month: month, entries }),
-      });
+      if (entries.length > 0) {
+        await apiRequest("/api/cost/amounts", {
+          method: "POST",
+          body: JSON.stringify({ period_month: month, entries }),
+        });
+      }
       setEditMode(false);
       await loadAll();
     } catch (err) {

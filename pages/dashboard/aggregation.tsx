@@ -114,18 +114,27 @@ export default function AggregationPage() {
     setSaving(true);
     setError(null);
     try {
-      await apiRequest("/api/counts", {
-        method: "POST",
-        body: JSON.stringify({
-          work_date: isoDate,
-          rows: rows.map((row) => ({
-            driver_id: row.driverId,
-            counts: Object.fromEntries(
-              Object.entries(draft[row.driverId] ?? {}).map(([catId, value]) => [catId, Number(value) || 0])
-            ),
-          })),
-        }),
-      });
+      // 他の利用者が同時に編集している場合に触っていないセルまで上書きしてしまわないよう、
+      // 読み込み時点の値（rows）から実際に変更されたセルのみを送信する。
+      const changedRows = rows
+        .map((row) => {
+          const counts: Record<string, number> = {};
+          for (const [catId, rawValue] of Object.entries(draft[row.driverId] ?? {})) {
+            const newValue = Number(rawValue) || 0;
+            if (newValue !== (row.counts[catId] ?? 0)) {
+              counts[catId] = newValue;
+            }
+          }
+          return { driver_id: row.driverId, counts };
+        })
+        .filter((row) => Object.keys(row.counts).length > 0);
+
+      if (changedRows.length > 0) {
+        await apiRequest("/api/counts", {
+          method: "POST",
+          body: JSON.stringify({ work_date: isoDate, rows: changedRows }),
+        });
+      }
       setEditMode(false);
       await loadDaily();
     } catch (err) {
