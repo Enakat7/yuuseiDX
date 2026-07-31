@@ -11,6 +11,7 @@ export const OPERATION_PAGE_KEYS = [
   "master",
   "settings",
   "log",
+  "loginLocks",
 ] as const;
 
 export type OperationPageKey = (typeof OPERATION_PAGE_KEYS)[number];
@@ -25,4 +26,5 @@ export const OPERATION_PAGE_LABELS: Record<OperationPageKey, string> = {
   master: "マスタ管理",
   settings: "設定",
   log: "ログ",
+  loginLocks: "ログインロック管理",
 };

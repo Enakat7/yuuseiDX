@@ -1,6 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { createClient } from "@/lib/supabase/server";
-import { isRateLimited } from "@/lib/rateLimit";
+import {
+  checkLoginLock,
+  describeLockStatus,
+  getClientIp,
+  registerLoginFailure,
+  resetLoginAttempts,
+  type LoginLockStatus,
+} from "@/lib/rateLimit";
 
 const EMAIL_MAX_LENGTH = 254;
 const PASSWORD_MAX_LENGTH = 128;
@@ -9,10 +16,8 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // ID・パスワードいずれの誤りかを区別しない(アカウント列挙・総当たり攻撃の手がかりを与えない)
 const GENERIC_ERROR = "ログインIDまたはパスワードが正しくありません。";
 
-function getClientIp(req: NextApiRequest): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (typeof forwarded === "string") return forwarded.split(",")[0].trim();
-  return req.socket.remoteAddress ?? "unknown";
+function sendLockResponse(res: NextApiResponse, status: Extract<LoginLockStatus, { locked: true }>) {
+  return res.status(429).json(describeLockStatus(status));
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -28,10 +33,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const ip = getClientIp(req);
-  if (isRateLimited(`login:${ip}`, 10, 15 * 60 * 1000)) {
-    return res
-      .status(429)
-      .json({ error: "試行回数が上限に達しました。しばらく時間をおいて再度お試しください。" });
+
+  const existingLock = await checkLoginLock(ip);
+  if (existingLock.locked) {
+    return sendLockResponse(res, existingLock);
   }
 
   const { email, password } = (req.body ?? {}) as { email?: unknown; password?: unknown };
@@ -53,6 +58,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error || !data.user) {
+    const failureStatus = await registerLoginFailure(ip);
+    if (failureStatus.locked) {
+      return sendLockResponse(res, failureStatus);
+    }
     return res.status(401).json({ error: GENERIC_ERROR });
   }
 
@@ -64,8 +73,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!profile) {
     await supabase.auth.signOut();
+    const failureStatus = await registerLoginFailure(ip);
+    if (failureStatus.locked) {
+      return sendLockResponse(res, failureStatus);
+    }
     return res.status(401).json({ error: GENERIC_ERROR });
   }
 
+  await resetLoginAttempts(ip);
   return res.status(200).json({ name: profile.name, role: profile.role });
 }

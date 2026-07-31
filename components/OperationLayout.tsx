@@ -21,11 +21,10 @@ const NAV_ITEMS: { label: string; href: string; pageKey: OperationPageKey }[] = 
   { label: "設定", href: "/dashboard/settings", pageKey: "settings" },
 ];
 
-const ADMIN_ONLY_ITEM: { label: string; href: string; pageKey: OperationPageKey } = {
-  label: "ログ",
-  href: "/dashboard/log",
-  pageKey: "log",
-};
+const ADMIN_ONLY_ITEMS: { label: string; href: string; pageKey: OperationPageKey }[] = [
+  { label: "ログ", href: "/dashboard/log", pageKey: "log" },
+  { label: "ログインロック管理", href: "/dashboard/login-locks", pageKey: "loginLocks" },
+];
 
 function isActive(pathname: string, href: string) {
   if (href === "/dashboard") return pathname === href;
@@ -35,7 +34,7 @@ function isActive(pathname: string, href: string) {
 // pathnameから該当するページキーを求める（/dashboard/master/price のようなサブページも
 // masterに丸める）。
 function resolvePageKey(pathname: string): OperationPageKey {
-  const all = [...NAV_ITEMS, ADMIN_ONLY_ITEM];
+  const all = [...NAV_ITEMS, ...ADMIN_ONLY_ITEMS];
   const matched = all.find((item) => isActive(pathname, item.href));
   return matched?.pageKey ?? "dashboard";
 }
@@ -69,7 +68,7 @@ export default function OperationLayout({ children }: { children: ReactNode }) {
   }, [ready, user.role, blockedKeys, router.pathname]);
 
   const visibleNavItems = NAV_ITEMS.filter((item) => user.role === "管理者" || !blockedKeys?.has(item.pageKey));
-  const navItems = user.role === "管理者" ? [...visibleNavItems, ADMIN_ONLY_ITEM] : visibleNavItems;
+  const navItems = user.role === "管理者" ? [...visibleNavItems, ...ADMIN_ONLY_ITEMS] : visibleNavItems;
 
   return (
     <div className="app">
