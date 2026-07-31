@@ -1,4 +1,14 @@
 import type { Database } from "@/types/database.types";
+import type {
+  BankAccountType,
+  ContractType,
+  DriverRole,
+  GasCardType,
+  PayType,
+  VehicleOwnership,
+} from "@/lib/constants";
+
+export type { BankAccountType, ContractType, DriverRole, GasCardType, PayType, VehicleOwnership };
 
 export type Area = Database["public"]["Tables"]["areas"]["Row"];
 export type District = Database["public"]["Tables"]["districts"]["Row"];
@@ -10,8 +20,6 @@ export type DriverDistrict = Database["public"]["Tables"]["driver_districts"]["R
 export type DriverDocument = Database["public"]["Tables"]["driver_documents"]["Row"];
 export type UnitPrice = Database["public"]["Tables"]["unit_prices"]["Row"];
 
-export type ContractType = Driver["contract_type"];
-export type PayType = Driver["pay_type"];
 export type PriceKind = UnitPrice["price_kind"];
 
 export type DriverWithRelations = Driver & {

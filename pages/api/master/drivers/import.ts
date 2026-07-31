@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { logOperation, requireStaffOrAdmin } from "@/lib/apiAuth";
+import { CONTRACT_TYPES, PAY_TYPES } from "@/lib/constants";
 
 type ImportRow = {
   name: string;
@@ -34,24 +35,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   ]);
 
   let imported = 0;
+  let skipped = 0;
   for (const row of rows) {
     const area = (areas ?? []).find((a) => a.name === row.area);
-    if (!area || !row.name || !row.contract_start_date) continue;
+    const contractTypeValid = (CONTRACT_TYPES as readonly string[]).includes(row.contract_type);
+    const payTypeValid = (PAY_TYPES as readonly string[]).includes(row.pay_type);
+    if (!area || !row.name || !row.contract_start_date || !contractTypeValid || !payTypeValid) {
+      skipped += 1;
+      continue;
+    }
 
     const { data: driver, error: driverError } = await supabase
       .from("drivers")
       .insert({
         name: row.name,
-        contract_type: row.contract_type === "法人" ? "法人" : "個人事業主",
+        contract_type: row.contract_type,
         area_id: area.id,
         contract_start_date: row.contract_start_date,
         phone: row.phone || null,
         email: row.email || null,
-        pay_type: row.pay_type === "月払い" ? "月払い" : "週払い",
+        pay_type: row.pay_type,
       })
       .select()
       .single();
-    if (driverError || !driver) continue;
+    if (driverError || !driver) {
+      skipped += 1;
+      continue;
+    }
 
     const districtNames = (row.districts ?? "")
       .split("/")
@@ -89,8 +99,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   await logOperation(supabase, {
     action: "CSVインポート",
     screenName: "マスタ管理(ドライバー)",
-    params: { count: imported },
+    params: { count: imported, skipped },
   });
 
-  return res.status(200).json({ imported });
+  return res.status(200).json({ imported, skipped });
 }

@@ -543,45 +543,123 @@ export type Database = {
       drivers: {
         Row: {
           active: boolean
+          address: string | null
+          advance_eligible: boolean
           area_id: string
+          bank_account_holder: string | null
+          bank_account_number: string | null
+          bank_account_type: string | null
+          bank_branch: string | null
+          bank_name: string | null
+          company_name: string | null
+          contract_deadline_date: string | null
+          contract_end_date: string | null
+          contract_indefinite: boolean
           contract_start_date: string
           contract_type: string
           created_at: string
+          driver_role: string | null
           email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relation: string | null
+          fixed_cost: number | null
+          gas_card_issued_date: string | null
+          gas_card_provided: boolean
+          gas_card_type: string | null
           id: string
           name: string
+          other_conditions: string | null
           pay_type: string
           phone: string | null
           profile_id: string | null
           updated_at: string
+          vehicle_inspection_deadline: string | null
+          vehicle_insurance_deadline: string | null
+          vehicle_lease_cost: number | null
+          vehicle_lease_start_date: string | null
+          vehicle_number: string | null
+          vehicle_ownership: string | null
         }
         Insert: {
           active?: boolean
+          address?: string | null
+          advance_eligible?: boolean
           area_id: string
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_account_type?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
+          company_name?: string | null
+          contract_deadline_date?: string | null
+          contract_end_date?: string | null
+          contract_indefinite?: boolean
           contract_start_date: string
           contract_type: string
           created_at?: string
+          driver_role?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relation?: string | null
+          fixed_cost?: number | null
+          gas_card_issued_date?: string | null
+          gas_card_provided?: boolean
+          gas_card_type?: string | null
           id?: string
           name: string
+          other_conditions?: string | null
           pay_type: string
           phone?: string | null
           profile_id?: string | null
           updated_at?: string
+          vehicle_inspection_deadline?: string | null
+          vehicle_insurance_deadline?: string | null
+          vehicle_lease_cost?: number | null
+          vehicle_lease_start_date?: string | null
+          vehicle_number?: string | null
+          vehicle_ownership?: string | null
         }
         Update: {
           active?: boolean
+          address?: string | null
+          advance_eligible?: boolean
           area_id?: string
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_account_type?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
+          company_name?: string | null
+          contract_deadline_date?: string | null
+          contract_end_date?: string | null
+          contract_indefinite?: boolean
           contract_start_date?: string
           contract_type?: string
           created_at?: string
+          driver_role?: string | null
           email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relation?: string | null
+          fixed_cost?: number | null
+          gas_card_issued_date?: string | null
+          gas_card_provided?: boolean
+          gas_card_type?: string | null
           id?: string
           name?: string
+          other_conditions?: string | null
           pay_type?: string
           phone?: string | null
           profile_id?: string | null
           updated_at?: string
+          vehicle_inspection_deadline?: string | null
+          vehicle_insurance_deadline?: string | null
+          vehicle_lease_cost?: number | null
+          vehicle_lease_start_date?: string | null
+          vehicle_number?: string | null
+          vehicle_ownership?: string | null
         }
         Relationships: [
           {

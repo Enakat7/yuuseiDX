@@ -1,14 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
-import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { logOperation, requireStaffOrAdmin } from "@/lib/apiAuth";
-
-// アカウント作成にはSupabase Admin API（service roleキー）が必要。このキーは
-// クライアントへ絶対に渡さず、このAPI Route内でのみ使用する（要件9.2）。
-function createAdminClient() {
-  return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-}
+import { createAdminClient } from "@/lib/supabase/server";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const auth = await requireStaffOrAdmin(req, res);

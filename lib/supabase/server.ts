@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { serialize } from "cookie";
 import type { NextApiRequest, NextApiResponse } from "next";
 
@@ -42,4 +43,12 @@ export function createClient(req: NextApiRequest, res: NextApiResponse) {
       },
     }
   );
+}
+
+// アカウント作成・パスワード再設定にはSupabase Admin API（service roleキー）が必要。
+// このキーはクライアントへ絶対に渡さず、API Route内でのみ使用する（要件9.2）。
+export function createAdminClient() {
+  return createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
 }

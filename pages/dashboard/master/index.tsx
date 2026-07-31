@@ -4,54 +4,68 @@ import OperationLayout from "@/components/OperationLayout";
 import MasterTabs from "@/components/MasterTabs";
 import Modal from "@/components/Modal";
 import { apiRequest, fileToBase64 } from "@/lib/apiClient";
+import { useCurrentUser } from "@/lib/currentUser";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
+import {
+  BANK_ACCOUNT_TYPES,
+  CONTRACT_TYPES,
+  DRIVER_ROLES,
+  GAS_CARD_TYPES,
+  PAY_TYPES,
+  VEHICLE_OWNERSHIPS,
+  type BankAccountType,
+  type ContractType,
+  type DriverRole,
+  type GasCardType,
+  type PayType,
+  type VehicleOwnership,
+} from "@/lib/constants";
 import type {
   Area,
-  ContractType,
+  DeliveryType,
   District,
   DocumentType,
+  Driver,
   DriverDocument,
   DriverWithRelations,
-  PayType,
+  UnitPrice,
 } from "@/types/domain/master";
 
 const DOC_EXPIRY_ALERT_DAYS = 30;
 
-type RawDriverRow = {
-  id: string;
-  name: string;
-  contract_type: ContractType;
-  area_id: string;
-  contract_start_date: string;
-  phone: string | null;
-  email: string | null;
-  pay_type: PayType;
-  active: boolean;
-  profile_id: string | null;
-  created_at: string;
-  updated_at: string;
+const DETAIL_TABS = [
+  { key: "basic", label: "基本情報" },
+  { key: "vehicle", label: "車両情報" },
+  { key: "gascard", label: "ガソリンカード" },
+  { key: "documents", label: "保管書類" },
+] as const;
+type DetailTabKey = (typeof DETAIL_TABS)[number]["key"];
+
+function formatYen(value: number) {
+  return value.toLocaleString("ja-JP");
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function cellKey(kind: string, areaId: string, deliveryTypeId: string) {
+  return `${kind}:${areaId}:${deliveryTypeId}`;
+}
+
+type RawDriverRow = Driver & {
   area: { id: string; name: string } | null;
   driver_districts: { district: { id: string; name: string } | null }[];
   driver_documents: DriverDocument[];
 };
 
 function toDriverWithRelations(row: RawDriverRow): DriverWithRelations {
+  const { driver_districts, driver_documents, area, ...driver } = row;
   return {
-    id: row.id,
-    name: row.name,
-    contract_type: row.contract_type,
-    area_id: row.area_id,
-    contract_start_date: row.contract_start_date,
-    phone: row.phone,
-    email: row.email,
-    pay_type: row.pay_type,
-    active: row.active,
-    profile_id: row.profile_id,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    area: row.area,
-    districts: row.driver_districts.map((dd) => dd.district).filter((d): d is { id: string; name: string } => !!d),
-    documents: row.driver_documents,
+    ...driver,
+    area,
+    districts: driver_districts.map((dd) => dd.district).filter((d): d is { id: string; name: string } => !!d),
+    documents: driver_documents,
   };
 }
 
@@ -68,48 +82,699 @@ function documentStatus(driver: DriverWithRelations, totalTypes: number) {
   return { tone: "pending", label: "一部未提出" };
 }
 
-const EMPTY_FORM = {
+// 新規登録フォーム・詳細モーダルの編集モードで共通して扱うドライバー項目一式。
+// 地区（districts）とUID・単価（都度計算）・パスワードは対象外（別枠で扱う）。
+type DriverFieldsDraft = {
+  name: string;
+  contractType: ContractType;
+  areaId: string;
+  contractStartDate: string;
+  phone: string;
+  email: string;
+  payType: PayType;
+  companyName: string;
+  driverRole: DriverRole | "";
+  contractEndDate: string;
+  contractIndefinite: boolean;
+  contractDeadlineDate: string;
+  fixedCost: string;
+  otherConditions: string;
+  emergencyContactName: string;
+  emergencyContactRelation: string;
+  emergencyContactPhone: string;
+  address: string;
+  bankName: string;
+  bankBranch: string;
+  bankAccountType: BankAccountType | "";
+  bankAccountNumber: string;
+  bankAccountHolder: string;
+  advanceEligible: boolean;
+  vehicleNumber: string;
+  vehicleOwnership: VehicleOwnership | "";
+  vehicleLeaseCost: string;
+  vehicleLeaseStartDate: string;
+  vehicleInspectionDeadline: string;
+  vehicleInsuranceDeadline: string;
+  gasCardProvided: boolean;
+  gasCardIssuedDate: string;
+  gasCardType: GasCardType | "";
+};
+
+const EMPTY_DRIVER_FIELDS: DriverFieldsDraft = {
   name: "",
-  contractType: "個人事業主" as ContractType,
+  contractType: "個人委託",
   areaId: "",
   contractStartDate: "",
   phone: "",
   email: "",
-  payType: "週払い" as PayType,
+  payType: "週払い",
+  companyName: "",
+  driverRole: "",
+  contractEndDate: "",
+  contractIndefinite: false,
+  contractDeadlineDate: "",
+  fixedCost: "",
+  otherConditions: "",
+  emergencyContactName: "",
+  emergencyContactRelation: "",
+  emergencyContactPhone: "",
+  address: "",
+  bankName: "",
+  bankBranch: "",
+  bankAccountType: "",
+  bankAccountNumber: "",
+  bankAccountHolder: "",
+  advanceEligible: false,
+  vehicleNumber: "",
+  vehicleOwnership: "",
+  vehicleLeaseCost: "",
+  vehicleLeaseStartDate: "",
+  vehicleInspectionDeadline: "",
+  vehicleInsuranceDeadline: "",
+  gasCardProvided: false,
+  gasCardIssuedDate: "",
+  gasCardType: "",
 };
 
+function driverToFields(driver: Driver): DriverFieldsDraft {
+  return {
+    name: driver.name,
+    contractType: driver.contract_type as ContractType,
+    areaId: driver.area_id,
+    contractStartDate: driver.contract_start_date,
+    phone: driver.phone ?? "",
+    email: driver.email ?? "",
+    payType: driver.pay_type as PayType,
+    companyName: driver.company_name ?? "",
+    driverRole: (driver.driver_role as DriverRole | null) ?? "",
+    contractEndDate: driver.contract_end_date ?? "",
+    contractIndefinite: driver.contract_indefinite,
+    contractDeadlineDate: driver.contract_deadline_date ?? "",
+    fixedCost: driver.fixed_cost != null ? String(driver.fixed_cost) : "",
+    otherConditions: driver.other_conditions ?? "",
+    emergencyContactName: driver.emergency_contact_name ?? "",
+    emergencyContactRelation: driver.emergency_contact_relation ?? "",
+    emergencyContactPhone: driver.emergency_contact_phone ?? "",
+    address: driver.address ?? "",
+    bankName: driver.bank_name ?? "",
+    bankBranch: driver.bank_branch ?? "",
+    bankAccountType: (driver.bank_account_type as BankAccountType | null) ?? "",
+    bankAccountNumber: driver.bank_account_number ?? "",
+    bankAccountHolder: driver.bank_account_holder ?? "",
+    advanceEligible: driver.advance_eligible,
+    vehicleNumber: driver.vehicle_number ?? "",
+    vehicleOwnership: (driver.vehicle_ownership as VehicleOwnership | null) ?? "",
+    vehicleLeaseCost: driver.vehicle_lease_cost != null ? String(driver.vehicle_lease_cost) : "",
+    vehicleLeaseStartDate: driver.vehicle_lease_start_date ?? "",
+    vehicleInspectionDeadline: driver.vehicle_inspection_deadline ?? "",
+    vehicleInsuranceDeadline: driver.vehicle_insurance_deadline ?? "",
+    gasCardProvided: driver.gas_card_provided,
+    gasCardIssuedDate: driver.gas_card_issued_date ?? "",
+    gasCardType: (driver.gas_card_type as GasCardType | null) ?? "",
+  };
+}
+
+function fieldsToApiBody(fields: DriverFieldsDraft) {
+  return {
+    name: fields.name,
+    contract_type: fields.contractType,
+    area_id: fields.areaId,
+    contract_start_date: fields.contractStartDate,
+    phone: fields.phone || null,
+    email: fields.email || null,
+    pay_type: fields.payType,
+    company_name: fields.companyName || null,
+    driver_role: fields.driverRole || null,
+    contract_end_date: fields.contractEndDate || null,
+    contract_indefinite: fields.contractIndefinite,
+    contract_deadline_date: fields.contractIndefinite ? null : fields.contractDeadlineDate || null,
+    fixed_cost: fields.fixedCost === "" ? null : Number(fields.fixedCost),
+    other_conditions: fields.otherConditions || null,
+    emergency_contact_name: fields.emergencyContactName || null,
+    emergency_contact_relation: fields.emergencyContactRelation || null,
+    emergency_contact_phone: fields.emergencyContactPhone || null,
+    address: fields.address || null,
+    bank_name: fields.bankName || null,
+    bank_branch: fields.bankBranch || null,
+    bank_account_type: fields.bankAccountType || null,
+    bank_account_number: fields.bankAccountNumber || null,
+    bank_account_holder: fields.bankAccountHolder || null,
+    advance_eligible: fields.advanceEligible,
+    vehicle_number: fields.vehicleNumber || null,
+    vehicle_ownership: fields.vehicleOwnership || null,
+    vehicle_lease_cost: fields.vehicleLeaseCost === "" ? null : Number(fields.vehicleLeaseCost),
+    vehicle_lease_start_date: fields.vehicleLeaseStartDate || null,
+    vehicle_inspection_deadline: fields.vehicleInspectionDeadline || null,
+    vehicle_insurance_deadline: fields.vehicleInsuranceDeadline || null,
+    gas_card_provided: fields.gasCardProvided,
+    gas_card_issued_date: fields.gasCardIssuedDate || null,
+    gas_card_type: fields.gasCardType || null,
+  };
+}
+
+// フィールド単位の「表示 / 編集」切り替え。新規登録フォームでは常にediting=trueで使う。
+function ViewOrInput({
+  id,
+  label,
+  value,
+  editing,
+  onChange,
+  type = "text",
+  displayValue,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  editing: boolean;
+  onChange: (value: string) => void;
+  type?: string;
+  displayValue?: string;
+}) {
+  return (
+    <div className="field" style={{ marginBottom: 12 }}>
+      <label htmlFor={id}>{label}</label>
+      {editing ? (
+        type === "textarea" ? (
+          <textarea id={id} value={value} onChange={(e) => onChange(e.target.value)} rows={3} />
+        ) : (
+          <input id={id} type={type} value={value} onChange={(e) => onChange(e.target.value)} />
+        )
+      ) : (
+        <p className="text-sm">{displayValue ?? (value || "-")}</p>
+      )}
+    </div>
+  );
+}
+
+function ViewOrSelect({
+  id,
+  label,
+  value,
+  editing,
+  onChange,
+  options,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  editing: boolean;
+  onChange: (value: string) => void;
+  options: readonly string[];
+}) {
+  return (
+    <div className="field" style={{ marginBottom: 12 }}>
+      <label htmlFor={id}>{label}</label>
+      {editing ? (
+        <select id={id} value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">未設定</option>
+          {options.map((o) => (
+            <option key={o} value={o}>
+              {o}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <p className="text-sm">{value || "-"}</p>
+      )}
+    </div>
+  );
+}
+
+function ViewOrRadio({
+  id,
+  label,
+  value,
+  editing,
+  onChange,
+  options,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  editing: boolean;
+  onChange: (value: string) => void;
+  options: readonly string[];
+}) {
+  return (
+    <div className="field" style={{ marginBottom: 12 }}>
+      <label id={`${id}-label`}>{label}</label>
+      {editing ? (
+        <div className="flex" style={{ gap: 16, flexWrap: "wrap" }} role="radiogroup" aria-labelledby={`${id}-label`}>
+          {options.map((o) => (
+            <label key={o} className="text-sm flex" style={{ gap: 6, alignItems: "center" }}>
+              <input type="radio" name={id} checked={value === o} onChange={() => onChange(o)} />
+              {o}
+            </label>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm">{value || "-"}</p>
+      )}
+    </div>
+  );
+}
+
+function ViewOrCheckbox({
+  id,
+  label,
+  checked,
+  editing,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  editing: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="field" style={{ marginBottom: 12 }}>
+      {editing ? (
+        <label className="text-sm flex" style={{ gap: 6, alignItems: "center" }} htmlFor={id}>
+          <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+          {label}
+        </label>
+      ) : (
+        <>
+          <label>{label}</label>
+          <p className="text-sm">{checked ? "有" : "無"}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function DriverBasicFields({
+  fields,
+  editing,
+  onChange,
+  areas,
+}: {
+  fields: DriverFieldsDraft;
+  editing: boolean;
+  onChange: (patch: Partial<DriverFieldsDraft>) => void;
+  areas: Area[];
+}) {
+  const areaName = areas.find((a) => a.id === fields.areaId)?.name ?? "";
+  return (
+    <>
+      <div className="field-row">
+        <ViewOrInput
+          id="driver-name"
+          label="名前"
+          value={fields.name}
+          editing={editing}
+          onChange={(v) => onChange({ name: v })}
+        />
+        <ViewOrInput
+          id="driver-company-name"
+          label="会社名"
+          value={fields.companyName}
+          editing={editing}
+          onChange={(v) => onChange({ companyName: v })}
+        />
+      </div>
+
+      <div className="field" style={{ marginBottom: 12 }}>
+        <label htmlFor="driver-area">所属エリア</label>
+        {editing ? (
+          <select
+            id="driver-area"
+            value={fields.areaId}
+            onChange={(e) => onChange({ areaId: e.target.value })}
+            required
+          >
+            <option value="" disabled>
+              選択してください
+            </option>
+            {areas.map((area) => (
+              <option key={area.id} value={area.id}>
+                {area.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <p className="text-sm">{areaName || "-"}</p>
+        )}
+      </div>
+
+      <ViewOrRadio
+        id="driver-contract-type"
+        label="契約形態"
+        value={fields.contractType}
+        editing={editing}
+        onChange={(v) => onChange({ contractType: v as ContractType })}
+        options={CONTRACT_TYPES}
+      />
+      <ViewOrSelect
+        id="driver-role"
+        label="役割"
+        value={fields.driverRole}
+        editing={editing}
+        onChange={(v) => onChange({ driverRole: v as DriverRole | "" })}
+        options={DRIVER_ROLES}
+      />
+
+      <div className="field-row">
+        <ViewOrInput
+          id="driver-contract-start"
+          label="契約開始日"
+          type="date"
+          value={fields.contractStartDate}
+          editing={editing}
+          onChange={(v) => onChange({ contractStartDate: v })}
+        />
+        <ViewOrInput
+          id="driver-contract-end"
+          label="契約終了日"
+          type="date"
+          value={fields.contractEndDate}
+          editing={editing}
+          onChange={(v) => onChange({ contractEndDate: v })}
+        />
+      </div>
+
+      <div className="field" style={{ marginBottom: 12 }}>
+        <label htmlFor="driver-contract-deadline">契約期限</label>
+        {editing ? (
+          <>
+            <label
+              className="text-sm flex"
+              style={{ gap: 6, alignItems: "center", marginBottom: 8 }}
+              htmlFor="driver-contract-indefinite"
+            >
+              <input
+                id="driver-contract-indefinite"
+                type="checkbox"
+                checked={fields.contractIndefinite}
+                onChange={(e) => onChange({ contractIndefinite: e.target.checked })}
+              />
+              無期雇用
+            </label>
+            {!fields.contractIndefinite && (
+              <input
+                id="driver-contract-deadline"
+                type="date"
+                value={fields.contractDeadlineDate}
+                onChange={(e) => onChange({ contractDeadlineDate: e.target.value })}
+              />
+            )}
+          </>
+        ) : (
+          <p className="text-sm">{fields.contractIndefinite ? "無期雇用" : fields.contractDeadlineDate || "-"}</p>
+        )}
+      </div>
+
+      <div className="field-row">
+        <ViewOrInput
+          id="driver-fixed-cost"
+          label="固定費"
+          type="number"
+          value={fields.fixedCost}
+          editing={editing}
+          onChange={(v) => onChange({ fixedCost: v })}
+          displayValue={fields.fixedCost ? `${formatYen(Number(fields.fixedCost))}円` : "-"}
+        />
+        <ViewOrCheckbox
+          id="driver-advance-eligible"
+          label="前払可能有無"
+          checked={fields.advanceEligible}
+          editing={editing}
+          onChange={(v) => onChange({ advanceEligible: v })}
+        />
+      </div>
+
+      <ViewOrInput
+        id="driver-other-conditions"
+        label="その他条件"
+        type="textarea"
+        value={fields.otherConditions}
+        editing={editing}
+        onChange={(v) => onChange({ otherConditions: v })}
+      />
+
+      <div className="field-row">
+        <ViewOrInput
+          id="driver-phone"
+          label="連絡先（電話番号）"
+          value={fields.phone}
+          editing={editing}
+          onChange={(v) => onChange({ phone: v })}
+        />
+        <ViewOrInput
+          id="driver-email"
+          label="メールアドレス"
+          type="email"
+          value={fields.email}
+          editing={editing}
+          onChange={(v) => onChange({ email: v })}
+        />
+      </div>
+
+      <p className="section-title" style={{ marginTop: 6 }}>
+        緊急連絡先
+      </p>
+      <div className="field-row">
+        <ViewOrInput
+          id="driver-emergency-name"
+          label="氏名"
+          value={fields.emergencyContactName}
+          editing={editing}
+          onChange={(v) => onChange({ emergencyContactName: v })}
+        />
+        <ViewOrInput
+          id="driver-emergency-relation"
+          label="続柄"
+          value={fields.emergencyContactRelation}
+          editing={editing}
+          onChange={(v) => onChange({ emergencyContactRelation: v })}
+        />
+      </div>
+      <ViewOrInput
+        id="driver-emergency-phone"
+        label="電話番号"
+        value={fields.emergencyContactPhone}
+        editing={editing}
+        onChange={(v) => onChange({ emergencyContactPhone: v })}
+      />
+
+      <ViewOrInput
+        id="driver-address"
+        label="住所"
+        value={fields.address}
+        editing={editing}
+        onChange={(v) => onChange({ address: v })}
+      />
+
+      <p className="section-title" style={{ marginTop: 6 }}>
+        振込口座
+      </p>
+      <div className="field-row">
+        <ViewOrInput
+          id="driver-bank-name"
+          label="銀行名"
+          value={fields.bankName}
+          editing={editing}
+          onChange={(v) => onChange({ bankName: v })}
+        />
+        <ViewOrInput
+          id="driver-bank-branch"
+          label="支店名"
+          value={fields.bankBranch}
+          editing={editing}
+          onChange={(v) => onChange({ bankBranch: v })}
+        />
+      </div>
+      <div className="field-row">
+        <ViewOrSelect
+          id="driver-bank-account-type"
+          label="口座種別"
+          value={fields.bankAccountType}
+          editing={editing}
+          onChange={(v) => onChange({ bankAccountType: v as BankAccountType | "" })}
+          options={BANK_ACCOUNT_TYPES}
+        />
+        <ViewOrInput
+          id="driver-bank-account-number"
+          label="口座番号"
+          value={fields.bankAccountNumber}
+          editing={editing}
+          onChange={(v) => onChange({ bankAccountNumber: v })}
+        />
+      </div>
+      <ViewOrInput
+        id="driver-bank-account-holder"
+        label="口座名義"
+        value={fields.bankAccountHolder}
+        editing={editing}
+        onChange={(v) => onChange({ bankAccountHolder: v })}
+      />
+
+      <ViewOrRadio
+        id="driver-pay-type"
+        label="支払種別"
+        value={fields.payType}
+        editing={editing}
+        onChange={(v) => onChange({ payType: v as PayType })}
+        options={PAY_TYPES}
+      />
+    </>
+  );
+}
+
+function DriverVehicleFields({
+  fields,
+  editing,
+  onChange,
+}: {
+  fields: DriverFieldsDraft;
+  editing: boolean;
+  onChange: (patch: Partial<DriverFieldsDraft>) => void;
+}) {
+  return (
+    <>
+      <ViewOrInput
+        id="driver-vehicle-number"
+        label="車両ナンバー"
+        value={fields.vehicleNumber}
+        editing={editing}
+        onChange={(v) => onChange({ vehicleNumber: v })}
+      />
+      <ViewOrRadio
+        id="driver-vehicle-ownership"
+        label="所有車両"
+        value={fields.vehicleOwnership}
+        editing={editing}
+        onChange={(v) => onChange({ vehicleOwnership: v as VehicleOwnership | "" })}
+        options={VEHICLE_OWNERSHIPS}
+      />
+      <div className="field-row">
+        <ViewOrInput
+          id="driver-vehicle-lease-cost"
+          label="貸出費用"
+          type="number"
+          value={fields.vehicleLeaseCost}
+          editing={editing}
+          onChange={(v) => onChange({ vehicleLeaseCost: v })}
+          displayValue={fields.vehicleLeaseCost ? `${formatYen(Number(fields.vehicleLeaseCost))}円` : "-"}
+        />
+        <ViewOrInput
+          id="driver-vehicle-lease-start"
+          label="貸出日"
+          type="date"
+          value={fields.vehicleLeaseStartDate}
+          editing={editing}
+          onChange={(v) => onChange({ vehicleLeaseStartDate: v })}
+        />
+      </div>
+      <div className="field-row">
+        <ViewOrInput
+          id="driver-vehicle-inspection-deadline"
+          label="車検期限"
+          type="date"
+          value={fields.vehicleInspectionDeadline}
+          editing={editing}
+          onChange={(v) => onChange({ vehicleInspectionDeadline: v })}
+        />
+        <ViewOrInput
+          id="driver-vehicle-insurance-deadline"
+          label="任意保険期限"
+          type="date"
+          value={fields.vehicleInsuranceDeadline}
+          editing={editing}
+          onChange={(v) => onChange({ vehicleInsuranceDeadline: v })}
+        />
+      </div>
+    </>
+  );
+}
+
+function DriverGasCardFields({
+  fields,
+  editing,
+  onChange,
+}: {
+  fields: DriverFieldsDraft;
+  editing: boolean;
+  onChange: (patch: Partial<DriverFieldsDraft>) => void;
+}) {
+  return (
+    <>
+      <ViewOrCheckbox
+        id="driver-gas-card-provided"
+        label="貸出有無"
+        checked={fields.gasCardProvided}
+        editing={editing}
+        onChange={(v) => onChange({ gasCardProvided: v })}
+      />
+      <div className="field-row">
+        <ViewOrInput
+          id="driver-gas-card-issued-date"
+          label="貸出日"
+          type="date"
+          value={fields.gasCardIssuedDate}
+          editing={editing}
+          onChange={(v) => onChange({ gasCardIssuedDate: v })}
+        />
+        <ViewOrSelect
+          id="driver-gas-card-type"
+          label="種類"
+          value={fields.gasCardType}
+          editing={editing}
+          onChange={(v) => onChange({ gasCardType: v as GasCardType | "" })}
+          options={GAS_CARD_TYPES}
+        />
+      </div>
+    </>
+  );
+}
+
 export default function MasterDriverPage() {
+  const { user } = useCurrentUser();
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const [areas, setAreas] = useState<Area[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
   const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([]);
+  const [deliveryTypes, setDeliveryTypes] = useState<DeliveryType[]>([]);
+  const [unitPrices, setUnitPrices] = useState<UnitPrice[]>([]);
   const [drivers, setDrivers] = useState<DriverWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState<DriverFieldsDraft>(EMPTY_DRIVER_FIELDS);
   const [selectedDistrictIds, setSelectedDistrictIds] = useState<string[]>([]);
   const [newDistrictName, setNewDistrictName] = useState("");
 
   const [detailDriverId, setDetailDriverId] = useState<string | null>(null);
   const detailDriver = drivers.find((d) => d.id === detailDriverId) ?? null;
+  const [activeTab, setActiveTab] = useState<DetailTabKey>("basic");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editDraft, setEditDraft] = useState<DriverFieldsDraft | null>(null);
+  const [docIndex, setDocIndex] = useState(0);
+  const [showAccountForm, setShowAccountForm] = useState(false);
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [passwordInput, setPasswordInput] = useState("");
 
   async function loadAll() {
     setLoading(true);
     setError(null);
     try {
-      const [areaRes, districtRes, docTypeRes, driverRes] = await Promise.all([
+      const [areaRes, districtRes, docTypeRes, deliveryTypeRes, unitPriceRes, driverRes] = await Promise.all([
         apiRequest<{ data: Area[] }>("/api/master/areas"),
         apiRequest<{ data: District[] }>("/api/master/districts"),
         apiRequest<{ data: DocumentType[] }>("/api/master/document-types"),
+        apiRequest<{ data: DeliveryType[] }>("/api/master/delivery-types"),
+        apiRequest<{ data: UnitPrice[] }>("/api/master/unit-prices"),
         apiRequest<{ data: RawDriverRow[] }>("/api/master/drivers"),
       ]);
       setAreas(areaRes.data);
       setDistricts(districtRes.data);
       setDocumentTypes(docTypeRes.data);
+      setDeliveryTypes(deliveryTypeRes.data);
+      setUnitPrices(unitPriceRes.data);
       setDrivers(driverRes.data.map(toDriverWithRelations));
     } catch (err) {
       setError(err instanceof Error ? err.message : "取得に失敗しました。");
@@ -124,10 +789,36 @@ export default function MasterDriverPage() {
     loadAll();
   }, []);
 
+  useEffect(() => {
+    // 詳細モーダルを開き直す・切り替えるたびにタブ・編集状態・書類カルーセルを
+    // リセットする意図的な副作用のため無効化する
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setActiveTab("basic");
+    setIsEditing(false);
+    setEditDraft(null);
+    setDocIndex(0);
+    setShowAccountForm(false);
+    setShowPasswordForm(false);
+    setPasswordInput("");
+  }, [detailDriverId]);
+
+  // 卸単価の「本日以前で最新」の値をセルキー単位で引く（master/price.tsxと同じロジック）
+  const latestPriceByCell = new Map<string, UnitPrice>();
+  const today = todayIso();
+  for (const p of unitPrices) {
+    if (p.effective_from > today) continue;
+    const key = cellKey(p.price_kind, p.area_id, p.delivery_type_id);
+    const current = latestPriceByCell.get(key);
+    if (!current || p.effective_from > current.effective_from) {
+      latestPriceByCell.set(key, p);
+    }
+  }
+  const priceTargetTypes = deliveryTypes.filter((dt) => dt.price_master_target);
+
   const districtsForForm = districts.filter((d) => d.area_id === form.areaId);
 
   function resetForm() {
-    setForm(EMPTY_FORM);
+    setForm(EMPTY_DRIVER_FIELDS);
     setSelectedDistrictIds([]);
     setNewDistrictName("");
   }
@@ -144,13 +835,7 @@ export default function MasterDriverPage() {
       await apiRequest("/api/master/drivers", {
         method: "POST",
         body: JSON.stringify({
-          name: form.name,
-          contract_type: form.contractType,
-          area_id: form.areaId,
-          contract_start_date: form.contractStartDate,
-          phone: form.phone || null,
-          email: form.email || null,
-          pay_type: form.payType,
+          ...fieldsToApiBody(form),
           district_ids: selectedDistrictIds,
           new_district_name: newDistrictName,
         }),
@@ -166,12 +851,74 @@ export default function MasterDriverPage() {
     }
   }
 
-  async function handleUpload(
-    driver: DriverWithRelations,
-    docType: DocumentType,
-    file: File,
-    expiresOn: string
-  ) {
+  function handleStartEdit() {
+    if (!detailDriver) return;
+    setEditDraft(driverToFields(detailDriver));
+    setIsEditing(true);
+  }
+
+  function handleCancelEdit() {
+    setIsEditing(false);
+    setEditDraft(null);
+  }
+
+  async function handleSaveEdit() {
+    if (!detailDriver || !editDraft) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest(`/api/master/drivers/${detailDriver.id}`, {
+        method: "PATCH",
+        body: JSON.stringify(fieldsToApiBody(editDraft)),
+      });
+      setIsEditing(false);
+      setEditDraft(null);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "更新に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleIssueAccount() {
+    if (!detailDriver || !passwordInput) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest(`/api/master/drivers/${detailDriver.id}/account`, {
+        method: "POST",
+        body: JSON.stringify({ password: passwordInput }),
+      });
+      setShowAccountForm(false);
+      setPasswordInput("");
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "アカウント発行に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!detailDriver || !passwordInput) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest(`/api/master/drivers/${detailDriver.id}/password`, {
+        method: "PATCH",
+        body: JSON.stringify({ password: passwordInput }),
+      });
+      setShowPasswordForm(false);
+      setPasswordInput("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "パスワード再設定に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleUpload(driver: DriverWithRelations, docType: DocumentType, file: File, expiresOn: string) {
     setSaving(true);
     setError(null);
     try {
@@ -251,10 +998,14 @@ export default function MasterDriverPage() {
         { key: "pay_type", header: "支払種別" },
       ]);
 
-      await apiRequest("/api/master/drivers/import", {
+      const res = await apiRequest<{ imported: number; skipped: number }>("/api/master/drivers/import", {
         method: "POST",
         body: JSON.stringify({ rows }),
       });
+
+      if (res.skipped > 0) {
+        setError(`${res.imported}件を取り込みました（${res.skipped}件は契約形態などの不正値のためスキップ）。`);
+      }
 
       await loadAll();
     } catch (err) {
@@ -262,6 +1013,12 @@ export default function MasterDriverPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  const editingFields = isEditing ? editDraft : detailDriver ? driverToFields(detailDriver) : null;
+
+  function updateEditDraft(patch: Partial<DriverFieldsDraft>) {
+    setEditDraft((prev) => (prev ? { ...prev, ...patch } : prev));
   }
 
   return (
@@ -316,11 +1073,12 @@ export default function MasterDriverPage() {
             <table>
               <thead>
                 <tr>
-                  <th>氏名</th>
+                  <th>名前</th>
+                  <th>所属</th>
                   <th>契約形態</th>
-                  <th>エリア / 地区</th>
-                  <th>契約開始日</th>
                   <th>連絡先</th>
+                  <th>メールアドレス</th>
+                  <th>前払可能有無</th>
                   <th>書類</th>
                   <th></th>
                 </tr>
@@ -328,7 +1086,7 @@ export default function MasterDriverPage() {
               <tbody>
                 {!loading && drivers.length === 0 && (
                   <tr>
-                    <td colSpan={7}>
+                    <td colSpan={8}>
                       <p className="empty-note">登録済みのドライバーはいません。</p>
                     </td>
                   </tr>
@@ -338,13 +1096,15 @@ export default function MasterDriverPage() {
                   return (
                     <tr key={driver.id}>
                       <td>{driver.name}</td>
+                      <td>{driver.area?.name ?? "-"}</td>
                       <td>{driver.contract_type}</td>
+                      <td>{driver.phone || "-"}</td>
+                      <td>{driver.email || "-"}</td>
                       <td>
-                        {driver.area?.name ?? "-"}
-                        {driver.districts.length > 0 && ` / ${driver.districts.map((d) => d.name).join("・")}`}
+                        <span className={`pill pill--${driver.advance_eligible ? "confirmed" : "pending"}`}>
+                          {driver.advance_eligible ? "有" : "無"}
+                        </span>
                       </td>
-                      <td>{driver.contract_start_date}</td>
-                      <td>{driver.phone || driver.email || "-"}</td>
                       <td>
                         <span className={`pill pill--${status.tone}`}>{status.label}</span>
                       </td>
@@ -363,69 +1123,10 @@ export default function MasterDriverPage() {
       </OperationLayout>
 
       {showCreate && (
-        <Modal title="ドライバー新規登録" onClose={() => setShowCreate(false)}>
+        <Modal title="ドライバー新規登録" onClose={() => setShowCreate(false)} wide>
           <form onSubmit={handleCreate}>
-            <div className="field">
-              <label htmlFor="driver-name">氏名</label>
-              <input
-                id="driver-name"
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                required
-              />
-            </div>
-
-            <div className="field">
-              <label>契約形態</label>
-              <div className="flex" style={{ gap: 16 }}>
-                {(["個人事業主", "法人"] as ContractType[]).map((type) => (
-                  <label key={type} className="text-sm flex" style={{ gap: 6, alignItems: "center" }}>
-                    <input
-                      type="radio"
-                      name="contract_type"
-                      checked={form.contractType === type}
-                      onChange={() => setForm((f) => ({ ...f, contractType: type }))}
-                    />
-                    {type}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="driver-area">エリア</label>
-                <select
-                  id="driver-area"
-                  value={form.areaId}
-                  onChange={(e) => {
-                    setForm((f) => ({ ...f, areaId: e.target.value }));
-                    setSelectedDistrictIds([]);
-                  }}
-                  required
-                >
-                  <option value="" disabled>
-                    選択してください
-                  </option>
-                  {areas.map((area) => (
-                    <option key={area.id} value={area.id}>
-                      {area.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="driver-start">契約開始日</label>
-                <input
-                  id="driver-start"
-                  type="date"
-                  value={form.contractStartDate}
-                  onChange={(e) => setForm((f) => ({ ...f, contractStartDate: e.target.value }))}
-                  required
-                />
-              </div>
-            </div>
+            <p className="section-title">基本情報</p>
+            <DriverBasicFields fields={form} editing onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} areas={areas} />
 
             {form.areaId && (
               <div className="field">
@@ -456,116 +1157,235 @@ export default function MasterDriverPage() {
               </div>
             )}
 
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="driver-phone">電話番号</label>
-                <input
-                  id="driver-phone"
-                  type="text"
-                  value={form.phone}
-                  onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="driver-email">メールアドレス</label>
-                <input
-                  id="driver-email"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                />
-              </div>
-            </div>
+            <p className="section-title" style={{ marginTop: 22 }}>
+              車両情報
+            </p>
+            <DriverVehicleFields fields={form} editing onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} />
 
-            <div className="field">
-              <label>支払種別</label>
-              <div className="flex" style={{ gap: 16 }}>
-                {(["週払い", "月払い"] as PayType[]).map((type) => (
-                  <label key={type} className="text-sm flex" style={{ gap: 6, alignItems: "center" }}>
-                    <input
-                      type="radio"
-                      name="pay_type"
-                      checked={form.payType === type}
-                      onChange={() => setForm((f) => ({ ...f, payType: type }))}
-                    />
-                    {type}
-                  </label>
-                ))}
-              </div>
-            </div>
+            <p className="section-title" style={{ marginTop: 22 }}>
+              ガソリンカード
+            </p>
+            <DriverGasCardFields fields={form} editing onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} />
 
-            <button type="submit" className="btn btn--primary btn--block" disabled={saving}>
+            <button type="submit" className="btn btn--primary btn--block" style={{ marginTop: 18 }} disabled={saving}>
               {saving ? "登録中..." : "登録する"}
             </button>
           </form>
         </Modal>
       )}
 
-      {detailDriver && (
+      {detailDriver && editingFields && (
         <Modal
           title={`ドライバー詳細 — ${detailDriver.name}`}
-          subtitle={`${detailDriver.area?.name ?? "-"} ${
-            detailDriver.districts.length > 0 ? `/ ${detailDriver.districts.map((d) => d.name).join("・")}` : ""
-          }`}
+          subtitle={`UID: ${detailDriver.id}`}
           onClose={() => setDetailDriverId(null)}
+          wide
+          headerAction={
+            isEditing ? (
+              <div className="flex" style={{ gap: 8 }}>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={handleCancelEdit} disabled={saving}>
+                  キャンセル
+                </button>
+                <button type="button" className="btn btn--primary btn--sm" onClick={handleSaveEdit} disabled={saving}>
+                  {saving ? "保存中..." : "保存"}
+                </button>
+              </div>
+            ) : (
+              <button type="button" className="btn btn--ghost btn--sm" onClick={handleStartEdit}>
+                編集
+              </button>
+            )
+          }
         >
-          <div className="grid grid--2">
+          <div className="tabbar" style={{ marginBottom: 22 }}>
+            {DETAIL_TABS.map((tab) => (
+              <a
+                key={tab.key}
+                href="#"
+                className={tab.key === activeTab ? "is-active" : undefined}
+                onClick={(event) => {
+                  event.preventDefault();
+                  setActiveTab(tab.key);
+                }}
+              >
+                {tab.label}
+              </a>
+            ))}
+          </div>
+
+          <div style={{ minHeight: "calc(94vh - 210px)" }}>
+          {activeTab === "basic" && (
             <div>
-              <p className="section-title">基本情報</p>
-              <p className="text-sm">
-                <strong>契約形態：</strong>
-                {detailDriver.contract_type}
+              <DriverBasicFields fields={editingFields} editing={isEditing} onChange={updateEditDraft} areas={areas} />
+
+              <p className="section-title" style={{ marginTop: 6 }}>
+                単価（卸単価・自動取得）
               </p>
-              <p className="text-sm">
-                <strong>契約開始日：</strong>
-                {detailDriver.contract_start_date}
-              </p>
-              <p className="text-sm">
-                <strong>電話番号：</strong>
-                {detailDriver.phone || "-"}
-              </p>
-              <p className="text-sm">
-                <strong>メールアドレス：</strong>
-                {detailDriver.email || "-"}
-              </p>
-              <p className="text-sm">
-                <strong>支払種別：</strong>
-                {detailDriver.pay_type}
-              </p>
+              <div className="table-wrap" style={{ marginBottom: 18 }}>
+                <table>
+                  <thead>
+                    <tr>
+                      {priceTargetTypes.map((dt) => (
+                        <th className="num" key={dt.id}>
+                          {dt.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      {priceTargetTypes.map((dt) => {
+                        const price = latestPriceByCell.get(cellKey("卸単価", detailDriver.area_id, dt.id));
+                        return (
+                          <td className="num" key={dt.id}>
+                            {price ? formatYen(price.price_yen) : "未設定"}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="section-title">パスワード</p>
+              <div style={{ marginBottom: 18 }}>
+                {!detailDriver.profile_id && !detailDriver.email && (
+                  <p className="text-sm text-muted">メールアドレスを設定するとアカウントを発行できます。</p>
+                )}
+                {!detailDriver.profile_id && detailDriver.email && user.role !== "管理者" && (
+                  <p className="text-sm text-muted">アカウント発行は管理者のみ行えます。</p>
+                )}
+                {!detailDriver.profile_id && detailDriver.email && user.role === "管理者" && !showAccountForm && (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowAccountForm(true)}>
+                    アカウント発行
+                  </button>
+                )}
+                {detailDriver.profile_id && !showPasswordForm && (
+                  <button type="button" className="btn btn--ghost btn--sm" onClick={() => setShowPasswordForm(true)}>
+                    パスワードを再設定
+                  </button>
+                )}
+                {(showAccountForm || showPasswordForm) && (
+                  <div className="flex" style={{ gap: 8, marginTop: 8, alignItems: "center" }}>
+                    <input
+                      type="password"
+                      placeholder="新しいパスワード"
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      style={{ maxWidth: 240 }}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn--primary btn--sm"
+                      disabled={saving || !passwordInput}
+                      onClick={showAccountForm ? handleIssueAccount : handleResetPassword}
+                    >
+                      {saving ? "処理中..." : "設定する"}
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn--ghost btn--sm"
+                      onClick={() => {
+                        setShowAccountForm(false);
+                        setShowPasswordForm(false);
+                        setPasswordInput("");
+                      }}
+                    >
+                      取消
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <p className="section-title">保管書類</p>
-              {documentTypes.map((docType) => {
-                const doc = detailDriver.documents.find((d) => d.document_type_id === docType.id);
-                if (doc) {
-                  return (
-                    <div key={docType.id} style={{ marginBottom: 6 }}>
-                      <button
-                        type="button"
-                        className="tag"
-                        style={{ cursor: "pointer" }}
-                        onClick={() => handleViewDocument(doc)}
-                      >
-                        {docType.label}
-                        {doc.expires_on && `（期限：${doc.expires_on}）`}
-                      </button>
-                    </div>
-                  );
-                }
-                return (
-                  <DocumentUploadRow
-                    key={docType.id}
-                    docType={docType}
-                    disabled={saving}
-                    onUpload={(file, expiresOn) => handleUpload(detailDriver, docType, file, expiresOn)}
-                  />
-                );
-              })}
-            </div>
+          )}
+
+          {activeTab === "vehicle" && (
+            <DriverVehicleFields fields={editingFields} editing={isEditing} onChange={updateEditDraft} />
+          )}
+
+          {activeTab === "gascard" && (
+            <DriverGasCardFields fields={editingFields} editing={isEditing} onChange={updateEditDraft} />
+          )}
+
+          {activeTab === "documents" && documentTypes.length > 0 && (
+            <DocumentCarousel
+              documentTypes={documentTypes}
+              docIndex={docIndex}
+              setDocIndex={setDocIndex}
+              driver={detailDriver}
+              saving={saving}
+              onUpload={handleUpload}
+              onView={handleViewDocument}
+            />
+          )}
           </div>
         </Modal>
       )}
     </>
+  );
+}
+
+function DocumentCarousel({
+  documentTypes,
+  docIndex,
+  setDocIndex,
+  driver,
+  saving,
+  onUpload,
+  onView,
+}: {
+  documentTypes: DocumentType[];
+  docIndex: number;
+  setDocIndex: (updater: (prev: number) => number) => void;
+  driver: DriverWithRelations;
+  saving: boolean;
+  onUpload: (driver: DriverWithRelations, docType: DocumentType, file: File, expiresOn: string) => void;
+  onView: (doc: DriverDocument) => void;
+}) {
+  const docType = documentTypes[docIndex];
+  const doc = driver.documents.find((d) => d.document_type_id === docType.id);
+
+  return (
+    <div>
+      <div className="flex" style={{ justifyContent: "center", marginBottom: 18 }}>
+        <div className="date-nav">
+          <button
+            type="button"
+            className="date-nav__btn"
+            aria-label="前の書類"
+            onClick={() => setDocIndex((i) => (i - 1 + documentTypes.length) % documentTypes.length)}
+          >
+            ‹
+          </button>
+          <span className="date-nav__value">
+            {docType.label}（{docIndex + 1}/{documentTypes.length}）
+          </span>
+          <button
+            type="button"
+            className="date-nav__btn"
+            aria-label="次の書類"
+            onClick={() => setDocIndex((i) => (i + 1) % documentTypes.length)}
+          >
+            ›
+          </button>
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 420, margin: "0 auto", textAlign: "center" }}>
+        {doc ? (
+          <button type="button" className="tag" style={{ cursor: "pointer", fontSize: 13 }} onClick={() => onView(doc)}>
+            {docType.label}
+            {doc.expires_on && `（期限：${doc.expires_on}）`}
+          </button>
+        ) : (
+          <DocumentUploadRow
+            docType={docType}
+            disabled={saving}
+            onUpload={(file, expiresOn) => onUpload(driver, docType, file, expiresOn)}
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -581,9 +1401,9 @@ function DocumentUploadRow({
   const [expiresOn, setExpiresOn] = useState("");
 
   return (
-    <div className="flex" style={{ gap: 8, alignItems: "center", marginBottom: 8, flexWrap: "wrap" }}>
+    <div className="flex" style={{ gap: 8, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
       <span className="tag" style={{ borderStyle: "dashed", color: "var(--gray-400)" }}>
-        {docType.label}
+        未提出
       </span>
       {docType.is_expiring && (
         <input
