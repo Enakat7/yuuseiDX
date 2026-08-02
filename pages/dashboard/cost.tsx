@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import CsvImportModal from "@/components/CsvImportModal";
 import Modal from "@/components/Modal";
@@ -18,11 +18,23 @@ function currentMonthIso(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
+function shiftMonth(monthIso: string, delta: number): string {
+  const [y, m] = monthIso.split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+}
+
+function formatMonthLabel(monthIso: string): string {
+  const [y, m] = monthIso.split("-");
+  return `${y}/${m}`;
+}
+
 export default function CostPage() {
   const [showImportModal, setShowImportModal] = useState(false);
 
   const [area, setArea] = useState<(typeof AREA_FILTER_TABS)[number]>("全エリア");
   const [month, setMonth] = useState(currentMonthIso());
+  const monthInputRef = useRef<HTMLInputElement>(null);
   const [columns, setColumns] = useState<string[]>([]);
   const [rows, setRows] = useState<CostRow[]>([]);
   const [draft, setDraft] = useState<Record<string, string>>({}); // itemId -> value
@@ -219,8 +231,48 @@ export default function CostPage() {
           <div>
             <h2>管理費集計</h2>
           </div>
-          <div className="flex">
-            <input type="month" value={month.slice(0, 7)} onChange={(e) => setMonth(`${e.target.value}-01`)} />
+          <div className="flex" style={{ alignItems: "center" }}>
+            <div className="date-nav">
+              <button
+                type="button"
+                className="date-nav__btn"
+                aria-label="前月"
+                onClick={() => setMonth((m) => shiftMonth(m, -1))}
+              >
+                ‹
+              </button>
+              <span
+                className="date-nav__value"
+                style={{ position: "relative", cursor: "pointer" }}
+                onClick={() => monthInputRef.current?.showPicker?.()}
+              >
+                {formatMonthLabel(month)}
+                <input
+                  ref={monthInputRef}
+                  type="month"
+                  value={month.slice(0, 7)}
+                  onChange={(e) => e.target.value && setMonth(`${e.target.value}-01`)}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    opacity: 0,
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                  }}
+                />
+              </span>
+              <button
+                type="button"
+                className="date-nav__btn"
+                aria-label="翌月"
+                onClick={() => setMonth((m) => shiftMonth(m, 1))}
+              >
+                ›
+              </button>
+            </div>
             <button className="btn btn--ghost" onClick={handleExport}>
               CSVエクスポート
             </button>

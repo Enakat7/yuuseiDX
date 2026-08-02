@@ -1,5 +1,5 @@
 import Head from "next/head";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import CsvImportModal from "@/components/CsvImportModal";
 import Modal from "@/components/Modal";
@@ -25,6 +25,7 @@ export default function AggregationPage() {
   const [area, setArea] = useState<(typeof AREA_FILTER_TABS)[number]>("全エリア");
   const [date, setDate] = useState(() => new Date());
   const [period, setPeriod] = useState<Period>("日次");
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const [categories, setCategories] = useState<CountCategory[]>([]);
   const [rows, setRows] = useState<CountRow[]>([]);
@@ -278,7 +279,51 @@ export default function AggregationPage() {
               専用画面から管理者/スタッフが直接入力した件数を集計・承認します（日報機能はありません）。
             </p>
           </div>
-          <div className="flex">
+          <div className="flex" style={{ alignItems: "center" }}>
+            <div className="date-nav">
+              <button
+                type="button"
+                className="date-nav__btn"
+                aria-label="前日"
+                onClick={() => setDate((d) => addDays(d, -1))}
+              >
+                ‹
+              </button>
+              <span
+                className="date-nav__value"
+                style={{ position: "relative", cursor: "pointer" }}
+                onClick={() => dateInputRef.current?.showPicker?.()}
+              >
+                {formatDate(date)}
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  value={toIsoDate(date)}
+                  onChange={(e) => {
+                    const [y, m, d] = e.target.value.split("-").map(Number);
+                    if (y && m && d) setDate(new Date(y, m - 1, d));
+                  }}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    opacity: 0,
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                  }}
+                />
+              </span>
+              <button
+                type="button"
+                className="date-nav__btn"
+                aria-label="翌日"
+                onClick={() => setDate((d) => addDays(d, 1))}
+              >
+                ›
+              </button>
+            </div>
             <button className="btn btn--ghost" onClick={handleExport}>
               CSVエクスポート
             </button>
@@ -325,41 +370,20 @@ export default function AggregationPage() {
         <div className="panel">
           <div className="panel__head">
             <h3>件数内訳（種類別）</h3>
-            <div className="flex" style={{ gap: 16, alignItems: "center" }}>
-              <div className="tabbar" style={{ marginBottom: 0 }}>
-                {PERIODS.map((p) => (
-                  <a
-                    key={p}
-                    href="#"
-                    className={p === period ? "is-active" : undefined}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      setPeriod(p);
-                    }}
-                  >
-                    {p}
-                  </a>
-                ))}
-              </div>
-              <div className="date-nav">
-                <button
-                  type="button"
-                  className="date-nav__btn"
-                  aria-label="前日"
-                  onClick={() => setDate((d) => addDays(d, -1))}
+            <div className="tabbar" style={{ marginBottom: 0 }}>
+              {PERIODS.map((p) => (
+                <a
+                  key={p}
+                  href="#"
+                  className={p === period ? "is-active" : undefined}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    setPeriod(p);
+                  }}
                 >
-                  ‹
-                </button>
-                <span className="date-nav__value">{formatDate(date)}</span>
-                <button
-                  type="button"
-                  className="date-nav__btn"
-                  aria-label="翌日"
-                  onClick={() => setDate((d) => addDays(d, 1))}
-                >
-                  ›
-                </button>
-              </div>
+                  {p}
+                </a>
+              ))}
             </div>
           </div>
 
