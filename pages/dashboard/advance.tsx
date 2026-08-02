@@ -2,10 +2,11 @@ import Head from "next/head";
 import { useEffect, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import CsvImportModal from "@/components/CsvImportModal";
+import Modal from "@/components/Modal";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
-import type { AdvanceRequestRow, AdvanceSimulation, AdvanceStatus } from "@/types/domain/advance";
+import type { AdvanceRequestRow, AdvanceStatus } from "@/types/domain/advance";
 import type { Driver } from "@/types/domain/master";
 
 const STATUS_TONE: Record<AdvanceStatus, string> = {
@@ -22,7 +23,6 @@ export default function AdvancePage() {
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [requests, setRequests] = useState<AdvanceRequestRow[]>([]);
   const [selectedDriverId, setSelectedDriverId] = useState("");
-  const [simulation, setSimulation] = useState<AdvanceSimulation | null>(null);
 
   const [payoutDate, setPayoutDate] = useState("");
   const [amount, setAmount] = useState("");
@@ -32,6 +32,7 @@ export default function AdvancePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   async function loadInitial() {
     setLoading(true);
@@ -56,17 +57,13 @@ export default function AdvancePage() {
     loadInitial();
   }, []);
 
-  useEffect(() => {
-    if (!selectedDriverId) {
-      // ドライバー選択解除時にシミュレーション結果をクリアする意図的な副作用のため無効化する
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setSimulation(null);
-      return;
-    }
-    apiRequest<{ data: AdvanceSimulation }>(`/api/advance/simulate?driver_id=${selectedDriverId}`)
-      .then((res) => setSimulation(res.data))
-      .catch((err) => setError(err instanceof Error ? err.message : "取得に失敗しました。"));
-  }, [selectedDriverId]);
+  function openCreateModal() {
+    setSelectedDriverId("");
+    setPayoutDate("");
+    setAmount("");
+    setNote("");
+    setShowCreateModal(true);
+  }
 
   async function handleCreate() {
     if (!selectedDriverId || !payoutDate || !amount) {
@@ -88,6 +85,7 @@ export default function AdvancePage() {
       setPayoutDate("");
       setAmount("");
       setNote("");
+      setShowCreateModal(false);
       await loadInitial();
     } catch (err) {
       setError(err instanceof Error ? err.message : "作成に失敗しました。");
@@ -175,6 +173,11 @@ export default function AdvancePage() {
               控除予定額を差し引いた前払可能額をもとに、入金日ベースで前払依頼書を作成します。
             </p>
           </div>
+          <div className="flex">
+            <button type="button" className="btn btn--ghost" onClick={openCreateModal}>
+              + 作成
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -182,84 +185,6 @@ export default function AdvancePage() {
             {error}
           </p>
         )}
-
-        <div className="grid grid--2">
-          <div className="panel">
-            <div className="panel__head">
-              <h3>前払可能額 シミュレーション</h3>
-            </div>
-            <div className="panel__body">
-              <div className="field">
-                <label>ドライバー</label>
-                <select value={selectedDriverId} onChange={(e) => setSelectedDriverId(e.target.value)}>
-                  <option value="">
-                    {drivers.length === 0 ? "登録済みドライバーがいません" : "選択してください"}
-                  </option>
-                  {drivers.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="table-wrap">
-                <table className="calc-table">
-                  <tbody>
-                    <tr>
-                      <td>ある時点までの本人の売上（自動計算・当月分）</td>
-                      <td className="num">{simulation ? formatYen(simulation.earnings) : "—"}</td>
-                    </tr>
-                    {(simulation?.deductions ?? []).map((row) => (
-                      <tr key={row.label}>
-                        <td>{row.label}</td>
-                        <td className="num">{formatYen(row.amount)}</td>
-                      </tr>
-                    ))}
-                    <tr className="total">
-                      <td>前払可能額</td>
-                      <td className="num">{simulation ? formatYen(simulation.available) : "—"}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-sm text-muted" style={{ marginTop: 10 }}>
-                前払可能額がマイナスの場合でも前払いを実行できます。
-              </p>
-            </div>
-          </div>
-
-          <div className="panel">
-            <div className="panel__head">
-              <h3>前払依頼書 新規作成</h3>
-            </div>
-            <div className="panel__body">
-              <div className="field-row">
-                <div className="field">
-                  <label htmlFor="pay-date">入金日</label>
-                  <input type="date" id="pay-date" value={payoutDate} onChange={(e) => setPayoutDate(e.target.value)} />
-                </div>
-                <div className="field">
-                  <label htmlFor="pay-amount">前払金額</label>
-                  <input type="number" id="pay-amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
-                </div>
-              </div>
-              <div className="field">
-                <label htmlFor="pay-note">備考</label>
-                <textarea
-                  id="pay-note"
-                  rows={3}
-                  placeholder="必要に応じて記入"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                />
-              </div>
-              <button className="btn btn--primary btn--block" onClick={handleCreate} disabled={saving}>
-                {saving ? "作成中..." : "前払依頼書を作成"}
-              </button>
-            </div>
-          </div>
-        </div>
 
         <div className="panel">
           <div className="panel__head">
@@ -313,6 +238,45 @@ export default function AdvancePage() {
           </div>
         </div>
       </OperationLayout>
+
+      {showCreateModal && (
+        <Modal title="前払依頼書 新規作成" onClose={() => setShowCreateModal(false)}>
+          <div className="field">
+            <label htmlFor="pay-driver">ドライバー</label>
+            <select id="pay-driver" value={selectedDriverId} onChange={(e) => setSelectedDriverId(e.target.value)}>
+              <option value="">{drivers.length === 0 ? "登録済みドライバーがいません" : "選択してください"}</option>
+              {drivers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="pay-date">入金日</label>
+              <input type="date" id="pay-date" value={payoutDate} onChange={(e) => setPayoutDate(e.target.value)} />
+            </div>
+            <div className="field">
+              <label htmlFor="pay-amount">前払金額</label>
+              <input type="number" id="pay-amount" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            </div>
+          </div>
+          <div className="field">
+            <label htmlFor="pay-note">備考</label>
+            <textarea
+              id="pay-note"
+              rows={3}
+              placeholder="必要に応じて記入"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </div>
+          <button className="btn btn--primary btn--block" onClick={handleCreate} disabled={saving}>
+            {saving ? "作成中..." : "前払依頼書を作成"}
+          </button>
+        </Modal>
+      )}
 
       {showImportModal && (
         <CsvImportModal

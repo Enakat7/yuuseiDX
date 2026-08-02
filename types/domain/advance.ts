@@ -6,11 +6,3 @@ export type AdvanceStatus = AdvanceRequest["status"];
 export type AdvanceRequestRow = AdvanceRequest & {
   driverName: string;
 };
-
-export type AdvanceSimulation = {
-  driverId: string;
-  earnings: number;
-  deductions: { label: string; amount: number }[];
-  deductionTotal: number;
-  available: number;
-};
