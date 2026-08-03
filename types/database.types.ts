@@ -351,6 +351,50 @@ export type Database = {
           },
         ]
       }
+      delivery_districts: {
+        Row: {
+          active: boolean
+          area_id: string | null
+          background_color: string
+          code: string
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          area_id?: string | null
+          background_color?: string
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          area_id?: string | null
+          background_color?: string
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_districts_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_types: {
         Row: {
           active: boolean

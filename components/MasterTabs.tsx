@@ -5,6 +5,7 @@ const TABS = [
   { label: "ドライバー", href: "/dashboard/master" },
   { label: "単価", href: "/dashboard/master/price" },
   { label: "配送種別", href: "/dashboard/master/type" },
+  { label: "配達地区", href: "/dashboard/master/delivery-districts" },
 ];
 
 export default function MasterTabs() {

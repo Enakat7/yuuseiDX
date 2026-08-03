@@ -13,6 +13,8 @@ export type { BankAccountType, ContractType, DriverRole, GasCardType, PayType, V
 export type Area = Database["public"]["Tables"]["areas"]["Row"];
 export type District = Database["public"]["Tables"]["districts"]["Row"];
 export type DeliveryType = Database["public"]["Tables"]["delivery_types"]["Row"];
+export type DeliveryDistrict = Database["public"]["Tables"]["delivery_districts"]["Row"];
+export type DeliveryDistrictWithArea = DeliveryDistrict & { area: Pick<Area, "id" | "name"> | null };
 export type CountCategory = Database["public"]["Tables"]["count_categories"]["Row"];
 export type DocumentType = Database["public"]["Tables"]["document_types"]["Row"];
 export type Driver = Database["public"]["Tables"]["drivers"]["Row"];

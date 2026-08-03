@@ -1065,6 +1065,45 @@ textarea:focus {
   gap: 6px;
 }
 
+/* ---------- Color palette (配達地区マスタ等の背景色選択) ---------- */
+
+.color-palette {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.color-palette__swatch {
+  width: 22px;
+  height: 22px;
+  border: var(--border-w-sm) solid var(--gray-200);
+  padding: 0;
+  cursor: pointer;
+}
+
+.color-palette__swatch.is-selected {
+  border-color: var(--black);
+  box-shadow: 0 0 0 2px var(--white) inset;
+}
+
+.color-palette__custom {
+  width: 28px;
+  height: 22px;
+  border: var(--border-w-sm) solid var(--gray-200);
+  padding: 0;
+  cursor: pointer;
+  background: none;
+}
+
+.color-swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  vertical-align: middle;
+  border: var(--border-w-sm) solid var(--gray-200);
+}
+
 /* ---------- Date nav (< yyyy/mm/dd >) ---------- */
 
 .date-nav {
