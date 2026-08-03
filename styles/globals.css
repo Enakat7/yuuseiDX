@@ -1012,10 +1012,16 @@ textarea:focus {
   border: var(--border-w-sm) solid var(--gray-150);
   font-size: 12px;
   font-weight: 700;
+  font-family: inherit;
+  color: inherit;
+  background: none;
+  padding: 0;
+  cursor: pointer;
 }
 
 .month-cal__day.is-empty {
   border-color: transparent;
+  cursor: default;
 }
 
 .month-cal__day.is-work {
@@ -1026,6 +1032,15 @@ textarea:focus {
 .month-cal__day.is-off {
   color: var(--gray-400);
   background: var(--gray-50);
+}
+
+.month-cal__day:hover:not(:disabled):not(.is-empty) {
+  border-color: var(--black);
+}
+
+.month-cal__day:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .month-cal__mark {

@@ -141,6 +141,33 @@ export default function SchedulePage() {
     }
   }
 
+  async function toggleMonthDay(day: number) {
+    if (!openDriverId) return;
+    const year = weekStart.getFullYear();
+    const month = weekStart.getMonth() + 1;
+    const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const nextWorked = !monthWorkedDates.has(iso);
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest("/api/schedule/days", {
+        method: "POST",
+        body: JSON.stringify({ driver_id: openDriverId, work_date: iso, worked: nextWorked }),
+      });
+      setMonthWorkedDates((prev) => {
+        const next = new Set(prev);
+        if (nextWorked) next.add(iso);
+        else next.delete(iso);
+        return next;
+      });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "更新に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function handleExport() {
     const csvRows = rows.map((row) => {
       const base: Record<string, string> = { driver: row.driverName };
@@ -384,10 +411,16 @@ export default function SchedulePage() {
               cell.day === null ? (
                 <div className="month-cal__day is-empty" key={index} />
               ) : (
-                <div className={`month-cal__day ${cell.isWork ? "is-work" : "is-off"}`} key={index}>
+                <button
+                  type="button"
+                  className={`month-cal__day ${cell.isWork ? "is-work" : "is-off"}`}
+                  key={index}
+                  onClick={() => toggleMonthDay(cell.day as number)}
+                  disabled={saving}
+                >
                   <span>{cell.day}</span>
                   <span className="month-cal__mark" />
-                </div>
+                </button>
               )
             )}
           </div>
