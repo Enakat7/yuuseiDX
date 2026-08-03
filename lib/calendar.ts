@@ -3,7 +3,7 @@ export type MonthCell = {
   isWork: boolean;
 };
 
-export const DOW_LABELS = ["月", "火", "水", "木", "金", "土", "日"];
+export const DOW_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
 /**
  * Builds a Mon-start month grid.
@@ -34,13 +34,13 @@ export function buildMonthGrid(
   return { cells, workCount };
 }
 
-/** Mon=0 ... Sun=6 weekday of a given date, regardless of locale. */
-export function mondayFirstWeekday(date: Date): number {
-  return (date.getDay() + 6) % 7;
+/** Sun=0 ... Sat=6 weekday of a given date (matches Date#getDay), regardless of locale. */
+export function sundayFirstWeekday(date: Date): number {
+  return date.getDay();
 }
 
 /**
- * Builds a Mon-start month grid from real per-day records (work_schedule_days),
+ * Builds a Sun-start month grid from real per-day records (work_schedule_days),
  * rather than a repeating weekly pattern.
  */
 export function buildMonthGridFromDates(
@@ -49,7 +49,7 @@ export function buildMonthGridFromDates(
   workedDates: Set<string> // "YYYY-MM-DD"
 ): { cells: MonthCell[]; workCount: number; daysInMonth: number } {
   const daysInMonth = new Date(year, month, 0).getDate();
-  const firstWeekday = mondayFirstWeekday(new Date(year, month - 1, 1));
+  const firstWeekday = sundayFirstWeekday(new Date(year, month - 1, 1));
   const totalCells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
   const cells: MonthCell[] = [];
   let workCount = 0;
