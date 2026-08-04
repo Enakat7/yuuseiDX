@@ -12,14 +12,14 @@ import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import type { ScheduleRow } from "@/types/domain/schedule";
 
 const STATUS_LABEL: Record<string, string> = {
-  未送信: "未送信",
-  送信済: "送信済",
-  要再送信: "要再送信",
+  未作成: "未作成",
+  作成中: "作成中",
+  作成済: "作成済",
 };
 const STATUS_TONE: Record<string, string> = {
-  未送信: "pending",
-  送信済: "confirmed",
-  要再送信: "alert",
+  未作成: "pending",
+  作成中: "alert",
+  作成済: "confirmed",
 };
 
 function nextMonthRange(): { start: string; end: string } {
@@ -94,35 +94,22 @@ export default function SchedulePage() {
     }
   }
 
-  async function handleIssueAll() {
-    const driverIds = rows.filter((r) => !r.orderStatus).map((r) => r.driverId);
+  async function handleBulkSend() {
+    const driverIds = rows.filter((r) => r.orderStatus === "作成済").map((r) => r.driverId);
     if (driverIds.length === 0) {
-      setError("対象期間の発注書が未発行のドライバーはいません。");
+      setError("作成済の発注書がありません。");
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      await apiRequest("/api/schedule/issue", {
+      await apiRequest("/api/schedule/orders/send", {
         method: "POST",
         body: JSON.stringify({ driver_ids: driverIds, period_start: periodStart, period_end: periodEnd }),
       });
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "発行に失敗しました。");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleReissue(orderId: string) {
-    setSaving(true);
-    setError(null);
-    try {
-      await apiRequest("/api/schedule/reissue", { method: "POST", body: JSON.stringify({ order_id: orderId }) });
-      await loadAll();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "再発行に失敗しました。");
+      setError(err instanceof Error ? err.message : "送信に失敗しました。");
     } finally {
       setSaving(false);
     }
@@ -138,6 +125,40 @@ export default function SchedulePage() {
       setMonthWorkedDates(new Set(res.workedDates));
     } catch (err) {
       setError(err instanceof Error ? err.message : "取得に失敗しました。");
+    }
+  }
+
+  async function setOrderStatus(driverId: string, status: "作成中" | "作成済") {
+    await apiRequest("/api/schedule/orders/status", {
+      method: "POST",
+      body: JSON.stringify({ driver_id: driverId, period_start: periodStart, period_end: periodEnd, status }),
+    });
+  }
+
+  async function handleConfirmOrder() {
+    if (!openDriverId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await setOrderStatus(openDriverId, "作成済");
+      setOpenDriverId(null);
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "確定に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCloseCalendar() {
+    const driverId = openDriverId;
+    setOpenDriverId(null);
+    if (!driverId) return;
+    try {
+      await setOrderStatus(driverId, "作成中");
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "更新に失敗しました。");
     }
   }
 
@@ -174,7 +195,7 @@ export default function SchedulePage() {
       weekDates.forEach((d, index) => {
         base[d.label] = row.week[index] ? "◯" : "-";
       });
-      base["発注書状況"] = STATUS_LABEL[row.orderStatus ?? "未送信"];
+      base["発注書状況"] = STATUS_LABEL[row.orderStatus ?? "未作成"];
       return base;
     });
     const csv = toCsv(csvRows, [
@@ -238,7 +259,7 @@ export default function SchedulePage() {
 
         <div className="panel" style={{ marginBottom: 22 }}>
           <div className="panel__head">
-            <h3>発注書の対象期間・発行</h3>
+            <h3>発注書の対象期間</h3>
           </div>
           <div className="panel__body">
             <div className="field-row">
@@ -250,14 +271,9 @@ export default function SchedulePage() {
                 <label htmlFor="period-end">対象期間終了</label>
                 <input id="period-end" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
               </div>
-              <div className="field" style={{ marginBottom: 0, alignSelf: "end" }}>
-                <button type="button" className="btn btn--ghost" onClick={handleIssueAll} disabled={saving}>
-                  未発行分を一括発行
-                </button>
-              </div>
             </div>
             <p className="text-sm text-muted" style={{ marginTop: 8 }}>
-              発注書は自動発行ではなく手動で発行します（デフォルトは翌月分）。稼働内容の変更後は自動的に「要再送信」になります。
+              稼働カレンダーで「確定」すると発注書が作成済になります。稼働内容の変更後は自動的に「作成中」に戻ります。
             </p>
           </div>
         </div>
@@ -285,6 +301,9 @@ export default function SchedulePage() {
               <span className="text-sm text-muted">{rows.length}名 稼働中</span>
               <button type="button" className="btn btn--ghost btn--sm" onClick={handleExport}>
                 CSVエクスポート
+              </button>
+              <button type="button" className="btn btn--primary btn--sm" onClick={handleBulkSend} disabled={saving}>
+                一括送信
               </button>
               <div className="date-nav">
                 <button
@@ -330,7 +349,7 @@ export default function SchedulePage() {
                   </tr>
                 )}
                 {rows.map((driver) => {
-                  const status = driver.orderStatus ?? "未送信";
+                  const status = driver.orderStatus ?? "未作成";
                   return (
                     <tr key={driver.driverId}>
                       <td>{driver.driverName}</td>
@@ -351,21 +370,9 @@ export default function SchedulePage() {
                         <span className={`pill pill--${STATUS_TONE[status]}`}>{STATUS_LABEL[status]}</span>
                       </td>
                       <td>
-                        <div className="flex" style={{ gap: 8 }}>
-                          <button type="button" className="btn btn--sm" onClick={() => openDetail(driver.driverId)}>
-                            詳細
-                          </button>
-                          {driver.orderStatus === "要再送信" && driver.orderId && (
-                            <button
-                              type="button"
-                              className="btn btn--sm"
-                              onClick={() => handleReissue(driver.orderId as string)}
-                              disabled={saving}
-                            >
-                              再発行
-                            </button>
-                          )}
-                        </div>
+                        <button type="button" className="btn btn--sm" onClick={() => openDetail(driver.driverId)}>
+                          詳細
+                        </button>
                       </td>
                     </tr>
                   );
@@ -382,7 +389,12 @@ export default function SchedulePage() {
           subtitle={`${area}エリア${
             openDriver.districtNames.length > 0 ? ` / ${openDriver.districtNames.join("・")}` : ""
           } ／ ${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月`}
-          onClose={() => setOpenDriverId(null)}
+          onClose={handleCloseCalendar}
+          headerAction={
+            <button type="button" className="btn btn--primary btn--sm" onClick={handleConfirmOrder} disabled={saving}>
+              確定
+            </button>
+          }
         >
           <div className="month-cal__stats">
             <div>
