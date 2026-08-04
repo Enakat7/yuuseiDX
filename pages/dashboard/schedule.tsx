@@ -10,6 +10,7 @@ import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import { addDays, getWeekDates, getWeekStartSunday, toIsoDate } from "@/lib/date";
 import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import type { ScheduleRow } from "@/types/domain/schedule";
+import type { DeliveryDistrictWithArea } from "@/types/domain/master";
 
 const STATUS_LABEL: Record<string, string> = {
   未作成: "未作成",
@@ -45,6 +46,20 @@ export default function SchedulePage() {
   const [openDriverId, setOpenDriverId] = useState<string | null>(null);
   const [monthWorkedDates, setMonthWorkedDates] = useState<Set<string>>(new Set());
   const [showImportModal, setShowImportModal] = useState(false);
+  const [deliveryDistricts, setDeliveryDistricts] = useState<DeliveryDistrictWithArea[]>([]);
+
+  useEffect(() => {
+    // マスタ一覧は稼働表の日別セル選択肢として使うだけなので初回のみ取得する
+    apiRequest<{ data: DeliveryDistrictWithArea[] }>("/api/master/delivery-districts")
+      .then((res) => setDeliveryDistricts(res.data))
+      .catch((err) => setError(err instanceof Error ? err.message : "配達地区の取得に失敗しました。"));
+  }, []);
+
+  const districtOptions = useMemo(
+    () => deliveryDistricts.filter((d) => d.area === null || d.area.name === area),
+    [deliveryDistricts, area]
+  );
+  const districtCodeToId = useMemo(() => new Map(deliveryDistricts.map((d) => [d.code, d.id])), [deliveryDistricts]);
 
   async function loadAll() {
     setLoading(true);
@@ -75,16 +90,17 @@ export default function SchedulePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [area, weekStart, periodStart, periodEnd]);
 
-  async function toggleDay(driverId: string, dayIndex: number) {
-    const row = rows.find((r) => r.driverId === driverId);
-    if (!row) return;
-    const nextWorked = !row.week[dayIndex];
+  async function setDay(driverId: string, dayIndex: number, deliveryDistrictId: string | null) {
     setSaving(true);
     setError(null);
     try {
       await apiRequest("/api/schedule/days", {
         method: "POST",
-        body: JSON.stringify({ driver_id: driverId, work_date: weekDates[dayIndex].iso, worked: nextWorked }),
+        body: JSON.stringify({
+          driver_id: driverId,
+          work_date: weekDates[dayIndex].iso,
+          delivery_district_id: deliveryDistrictId,
+        }),
       });
       await loadAll();
     } catch (err) {
@@ -193,7 +209,7 @@ export default function SchedulePage() {
     const csvRows = rows.map((row) => {
       const base: Record<string, string> = { driver: row.driverName };
       weekDates.forEach((d, index) => {
-        base[d.label] = row.week[index] ? "◯" : "-";
+        base[d.label] = row.week[index].code ?? "-";
       });
       base["発注書状況"] = STATUS_LABEL[row.orderStatus ?? "未作成"];
       return base;
@@ -219,9 +235,12 @@ export default function SchedulePage() {
       for (const d of weekDates) {
         const raw = parsedRow[d.label];
         if (raw === undefined || raw === "") continue;
+        const code = raw.trim();
+        const deliveryDistrictId = code === "-" ? null : (districtCodeToId.get(code) ?? null);
+        if (code !== "-" && deliveryDistrictId === null) continue;
         await apiRequest("/api/schedule/days", {
           method: "POST",
-          body: JSON.stringify({ driver_id: row.driverId, work_date: d.iso, worked: raw.trim() === "◯" }),
+          body: JSON.stringify({ driver_id: row.driverId, work_date: d.iso, delivery_district_id: deliveryDistrictId }),
         });
       }
       count += 1;
@@ -355,17 +374,21 @@ export default function SchedulePage() {
                   return (
                     <tr key={driver.driverId}>
                       <td>{driver.driverName}</td>
-                      {driver.week.map((worked, index) => (
+                      {driver.week.map((cell, index) => (
                         <td key={index}>
-                          <button
-                            type="button"
-                            className="btn btn--sm btn--ghost"
-                            style={{ padding: "4px 10px" }}
-                            onClick={() => toggleDay(driver.driverId, index)}
+                          <select
+                            value={cell.deliveryDistrictId ?? ""}
+                            onChange={(e) => setDay(driver.driverId, index, e.target.value || null)}
                             disabled={saving}
+                            style={{ backgroundColor: cell.backgroundColor ?? undefined }}
                           >
-                            {worked ? "◯" : "-"}
-                          </button>
+                            <option value="">-</option>
+                            {districtOptions.map((d) => (
+                              <option key={d.id} value={d.id}>
+                                {d.code}
+                              </option>
+                            ))}
+                          </select>
                         </td>
                       ))}
                       <td>
@@ -455,7 +478,7 @@ export default function SchedulePage() {
       {showImportModal && (
         <CsvImportModal
           title="発注書(稼働表) CSVインポート"
-          description="表示中の週に取り込みます。列: ドライバー・（曜日ラベルを列見出しとした◯/-）"
+          description="表示中の週に取り込みます。列: ドライバー・（曜日ラベルを列見出しとした配達地区コード/-）"
           onImport={handleImportFile}
           onClose={() => setShowImportModal(false)}
         />

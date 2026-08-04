@@ -1341,6 +1341,7 @@ export type Database = {
       work_schedule_days: {
         Row: {
           created_at: string
+          delivery_district_id: string | null
           driver_id: string
           id: string
           updated_at: string
@@ -1350,6 +1351,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          delivery_district_id?: string | null
           driver_id: string
           id?: string
           updated_at?: string
@@ -1359,6 +1361,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          delivery_district_id?: string | null
           driver_id?: string
           id?: string
           updated_at?: string
@@ -1367,6 +1370,13 @@ export type Database = {
           worked?: boolean
         }
         Relationships: [
+          {
+            foreignKeyName: "work_schedule_days_delivery_district_id_fkey"
+            columns: ["delivery_district_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_districts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "work_schedule_days_driver_id_fkey"
             columns: ["driver_id"]
