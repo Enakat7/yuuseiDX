@@ -7,11 +7,14 @@ import { buildMonthGridFromDates, DOW_LABELS } from "@/lib/calendar";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import type { MyOrderRow } from "@/types/domain/mypage";
 
-const STATUS_TONE: Record<string, string> = {
-  未送信: "pending",
-  送信済: "confirmed",
-  要再送信: "alert",
+const APPROVAL_TONE: Record<string, string> = {
+  承認済: "confirmed",
+  未承認: "pending",
 };
+
+function approvalLabel(order: MyOrderRow): "承認済" | "未承認" {
+  return order.driver_approved_at ? "承認済" : "未承認";
+}
 
 export default function DriverOrderPage() {
   const [orders, setOrders] = useState<MyOrderRow[]>([]);
@@ -22,6 +25,7 @@ export default function DriverOrderPage() {
   const [monthWorkedDates, setMonthWorkedDates] = useState<Set<string>>(new Set());
   const [monthYear, setMonthYear] = useState<number | null>(null);
   const [monthMonth, setMonthMonth] = useState<number | null>(null);
+  const [approving, setApproving] = useState(false);
 
   useEffect(() => {
     // 初回マウント時にAPI経由で発注書一覧を取得する意図的な副作用のため無効化する
@@ -47,11 +51,26 @@ export default function DriverOrderPage() {
     }
   }
 
+  async function handleApprove() {
+    if (!openOrderId) return;
+    setApproving(true);
+    try {
+      const res = await apiRequest<{ data: MyOrderRow }>(`/api/me/orders/${openOrderId}/approve`, {
+        method: "POST",
+      });
+      setOrders((prev) => prev.map((o) => (o.id === res.data.id ? res.data : o)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "承認に失敗しました。");
+    } finally {
+      setApproving(false);
+    }
+  }
+
   function handleExport() {
     const csv = toCsv(
       orders.map((o) => ({
         period: `${o.period_start}〜${o.period_end}`,
-        status: o.status,
+        status: approvalLabel(o),
         issued: o.issued_at ? new Date(o.issued_at).toLocaleDateString("ja-JP") : "",
       })),
       [
@@ -120,7 +139,9 @@ export default function DriverOrderPage() {
                     </td>
                     <td>{order.issued_at ? new Date(order.issued_at).toLocaleDateString("ja-JP") : "-"}</td>
                     <td>
-                      <span className={`pill pill--${STATUS_TONE[order.status]}`}>{order.status}</span>
+                      <span className={`pill pill--${APPROVAL_TONE[approvalLabel(order)]}`}>
+                        {approvalLabel(order)}
+                      </span>
                     </td>
                     <td>
                       <button type="button" className="btn btn--sm" onClick={() => openDetail(order.id)}>
@@ -140,6 +161,15 @@ export default function DriverOrderPage() {
           title="稼働カレンダー"
           subtitle={`${monthYear}年${monthMonth}月 対象期間：${openOrder.period_start}〜${openOrder.period_end}`}
           onClose={() => setOpenOrderId(null)}
+          headerAction={
+            openOrder.driver_approved_at ? (
+              <span className={`pill pill--${APPROVAL_TONE.承認済}`}>承認済</span>
+            ) : (
+              <button type="button" className="btn btn--primary btn--sm" onClick={handleApprove} disabled={approving}>
+                {approving ? "承認中..." : "承認する"}
+              </button>
+            )
+          }
         >
           <div className="month-cal__stats">
             <div>

@@ -1199,6 +1199,8 @@ export type Database = {
           area_id: string | null
           created_at: string
           district_id: string | null
+          driver_approved_at: string | null
+          driver_approved_ip: string | null
           driver_id: string
           id: string
           issued_at: string | null
@@ -1216,6 +1218,8 @@ export type Database = {
           area_id?: string | null
           created_at?: string
           district_id?: string | null
+          driver_approved_at?: string | null
+          driver_approved_ip?: string | null
           driver_id: string
           id?: string
           issued_at?: string | null
@@ -1233,6 +1237,8 @@ export type Database = {
           area_id?: string | null
           created_at?: string
           district_id?: string | null
+          driver_approved_at?: string | null
+          driver_approved_ip?: string | null
           driver_id?: string
           id?: string
           issued_at?: string | null
@@ -1384,6 +1390,10 @@ export type Database = {
     Functions: {
       acknowledge_payment_notice: {
         Args: { p_ip?: string; p_notice_id: string }
+        Returns: undefined
+      }
+      approve_purchase_order: {
+        Args: { p_ip?: string; p_order_id: string }
         Returns: undefined
       }
       current_driver_id: { Args: never; Returns: string }
