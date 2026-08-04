@@ -7,7 +7,7 @@ import { buildMonthGridFromDates, DOW_LABELS } from "@/lib/calendar";
 import { AREA_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
-import { addDays, getWeekDates, getWeekRange, toIsoDate } from "@/lib/date";
+import { addDays, getWeekDates, getWeekStartSunday, toIsoDate } from "@/lib/date";
 import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import type { ScheduleRow } from "@/types/domain/schedule";
 
@@ -31,7 +31,7 @@ function nextMonthRange(): { start: string; end: string } {
 
 export default function SchedulePage() {
   const [area, setArea] = useState<(typeof AREA_TABS)[number]>("西");
-  const [weekStart, setWeekStart] = useState(() => new Date(getWeekRange(new Date()).start));
+  const [weekStart, setWeekStart] = useState(() => new Date(getWeekStartSunday(new Date())));
   const [rows, setRows] = useState<ScheduleRow[]>([]);
   const [weekDates, setWeekDates] = useState(() => getWeekDates(weekStart));
   const [loading, setLoading] = useState(true);

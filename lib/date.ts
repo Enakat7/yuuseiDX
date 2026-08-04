@@ -27,6 +27,12 @@ export function getWeekRange(date: Date): { start: string; end: string } {
   return { start: toIsoDate(start), end: toIsoDate(end) };
 }
 
+// 日曜始まりの週の開始日（ISO文字列）を返す（稼働表の日付カラム表示用）
+export function getWeekStartSunday(date: Date): string {
+  const start = addDays(date, -date.getDay());
+  return toIsoDate(start);
+}
+
 // 月初・月末（ISO文字列）を返す
 export function getMonthRange(date: Date): { start: string; end: string } {
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
