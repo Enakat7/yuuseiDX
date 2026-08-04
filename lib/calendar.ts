@@ -68,3 +68,49 @@ export function buildMonthGridFromDates(
 
   return { cells, workCount, daysInMonth };
 }
+
+export type MonthDistrictCell = {
+  day: number | null;
+  deliveryDistrictId: string | null;
+  code: string | null;
+  backgroundColor: string | null;
+  worked: boolean;
+};
+
+export type MonthDistrictEntry = { id: string; code: string; backgroundColor: string; worked: boolean };
+
+/**
+ * Sun-start month grid with a per-day delivery district assignment
+ * (稼働カレンダーで日別に配達地区コードを選択するための版）。
+ */
+export function buildMonthGridFromDistrictMap(
+  year: number,
+  month: number, // 1-12
+  entries: Map<string, MonthDistrictEntry> // "YYYY-MM-DD" -> assigned district
+): { cells: MonthDistrictCell[]; workCount: number; daysInMonth: number } {
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const firstWeekday = sundayFirstWeekday(new Date(year, month - 1, 1));
+  const totalCells = Math.ceil((firstWeekday + daysInMonth) / 7) * 7;
+  const cells: MonthDistrictCell[] = [];
+  let workCount = 0;
+
+  for (let slot = 0; slot < totalCells; slot++) {
+    const day = slot - firstWeekday + 1;
+    if (day < 1 || day > daysInMonth) {
+      cells.push({ day: null, deliveryDistrictId: null, code: null, backgroundColor: null, worked: false });
+      continue;
+    }
+    const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const entry = entries.get(iso);
+    if (entry?.worked) workCount += 1;
+    cells.push({
+      day,
+      deliveryDistrictId: entry?.id ?? null,
+      code: entry?.code ?? null,
+      backgroundColor: entry?.backgroundColor ?? null,
+      worked: entry?.worked ?? false,
+    });
+  }
+
+  return { cells, workCount, daysInMonth };
+}

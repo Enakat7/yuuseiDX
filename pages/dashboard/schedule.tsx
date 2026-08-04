@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import Modal from "@/components/Modal";
 import CsvImportModal from "@/components/CsvImportModal";
-import { buildMonthGridFromDates, DOW_LABELS } from "@/lib/calendar";
+import { buildMonthGridFromDistrictMap, DOW_LABELS, type MonthDistrictEntry } from "@/lib/calendar";
 import { AREA_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
@@ -44,7 +44,7 @@ export default function SchedulePage() {
   const [periodEnd, setPeriodEnd] = useState(defaultPeriod.end);
 
   const [openDriverId, setOpenDriverId] = useState<string | null>(null);
-  const [monthWorkedDates, setMonthWorkedDates] = useState<Set<string>>(new Set());
+  const [monthDays, setMonthDays] = useState<Map<string, string | null>>(new Map());
   const [showImportModal, setShowImportModal] = useState(false);
   const [deliveryDistricts, setDeliveryDistricts] = useState<DeliveryDistrictWithArea[]>([]);
 
@@ -60,6 +60,7 @@ export default function SchedulePage() {
     [deliveryDistricts, area]
   );
   const districtCodeToId = useMemo(() => new Map(deliveryDistricts.map((d) => [d.code, d.id])), [deliveryDistricts]);
+  const districtById = useMemo(() => new Map(deliveryDistricts.map((d) => [d.id, d])), [deliveryDistricts]);
 
   async function loadAll() {
     setLoading(true);
@@ -135,10 +136,10 @@ export default function SchedulePage() {
     setOpenDriverId(driverId);
     const d = weekStart;
     try {
-      const res = await apiRequest<{ workedDates: string[] }>(
+      const res = await apiRequest<{ days: { workDate: string; deliveryDistrictId: string | null }[] }>(
         `/api/schedule/month?driver_id=${driverId}&year=${d.getFullYear()}&month=${d.getMonth() + 1}`
       );
-      setMonthWorkedDates(new Set(res.workedDates));
+      setMonthDays(new Map(res.days.map((day) => [day.workDate, day.deliveryDistrictId])));
     } catch (err) {
       setError(err instanceof Error ? err.message : "取得に失敗しました。");
     }
@@ -178,23 +179,21 @@ export default function SchedulePage() {
     }
   }
 
-  async function toggleMonthDay(day: number) {
+  async function setMonthDay(day: number, deliveryDistrictId: string | null) {
     if (!openDriverId) return;
     const year = weekStart.getFullYear();
     const month = weekStart.getMonth() + 1;
     const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    const nextWorked = !monthWorkedDates.has(iso);
     setSaving(true);
     setError(null);
     try {
       await apiRequest("/api/schedule/days", {
         method: "POST",
-        body: JSON.stringify({ driver_id: openDriverId, work_date: iso, worked: nextWorked }),
+        body: JSON.stringify({ driver_id: openDriverId, work_date: iso, delivery_district_id: deliveryDistrictId }),
       });
-      setMonthWorkedDates((prev) => {
-        const next = new Set(prev);
-        if (nextWorked) next.add(iso);
-        else next.delete(iso);
+      setMonthDays((prev) => {
+        const next = new Map(prev);
+        next.set(iso, deliveryDistrictId);
         return next;
       });
       await loadAll();
@@ -254,8 +253,20 @@ export default function SchedulePage() {
   const openDriver = rows.find((r) => r.driverId === openDriverId) ?? null;
   const monthGrid = useMemo(() => {
     if (!openDriver) return null;
-    return buildMonthGridFromDates(weekStart.getFullYear(), weekStart.getMonth() + 1, monthWorkedDates);
-  }, [openDriver, monthWorkedDates, weekStart]);
+    const entries = new Map<string, MonthDistrictEntry>();
+    for (const [iso, districtId] of monthDays) {
+      if (!districtId) continue;
+      const district = districtById.get(districtId);
+      if (!district) continue;
+      entries.set(iso, {
+        id: district.id,
+        code: district.code,
+        backgroundColor: district.background_color,
+        worked: district.area !== null,
+      });
+    }
+    return buildMonthGridFromDistrictMap(weekStart.getFullYear(), weekStart.getMonth() + 1, entries);
+  }, [openDriver, monthDays, districtById, weekStart]);
 
   return (
     <>
@@ -415,62 +426,110 @@ export default function SchedulePage() {
             openDriver.districtNames.length > 0 ? ` / ${openDriver.districtNames.join("・")}` : ""
           } ／ ${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月`}
           onClose={handleCloseCalendar}
+          wide
           headerAction={
             <button type="button" className="btn btn--primary btn--sm" onClick={handleConfirmOrder} disabled={saving}>
               確定
             </button>
           }
         >
-          <div className="month-cal__stats">
-            <div>
-              <div className="month-cal__stat-label">稼働日数</div>
-              <div className="month-cal__stat-value">
-                {monthGrid.workCount}
-                <small style={{ fontSize: 12, fontWeight: 700, marginLeft: 2 }}>日</small>
-              </div>
+          <div className="flex" style={{ gap: 24, alignItems: "flex-start" }}>
+            <div
+              style={{
+                width: 240,
+                flexShrink: 0,
+                maxHeight: 560,
+                overflowY: "auto",
+                borderRight: "var(--border-w-sm) solid var(--gray-150)",
+                paddingRight: 16,
+              }}
+            >
+              <p className="month-cal__stat-label" style={{ marginBottom: 8 }}>
+                配達地区コード一覧
+              </p>
+              <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: 6 }}>
+                {districtOptions.map((d) => (
+                  <li key={d.id} className="flex" style={{ gap: 8, alignItems: "center", fontSize: 12 }}>
+                    <span
+                      style={{
+                        width: 14,
+                        height: 14,
+                        flexShrink: 0,
+                        background: d.background_color,
+                        border: "1px solid var(--gray-300)",
+                      }}
+                    />
+                    <span style={{ fontWeight: 700, fontFamily: "var(--font-mono)" }}>{d.code}</span>
+                    <span style={{ color: "var(--gray-600)" }}>{d.name}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <div>
-              <div className="month-cal__stat-label">休み</div>
-              <div className="month-cal__stat-value">
-                {monthGrid.daysInMonth - monthGrid.workCount}
-                <small style={{ fontSize: 12, fontWeight: 700, marginLeft: 2 }}>日</small>
-              </div>
-            </div>
-          </div>
 
-          <div className="month-cal">
-            {DOW_LABELS.map((d) => (
-              <div className="month-cal__dow" key={d}>
-                {d}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="month-cal__stats">
+                <div>
+                  <div className="month-cal__stat-label">稼働日数</div>
+                  <div className="month-cal__stat-value">
+                    {monthGrid.workCount}
+                    <small style={{ fontSize: 12, fontWeight: 700, marginLeft: 2 }}>日</small>
+                  </div>
+                </div>
+                <div>
+                  <div className="month-cal__stat-label">休み</div>
+                  <div className="month-cal__stat-value">
+                    {monthGrid.daysInMonth - monthGrid.workCount}
+                    <small style={{ fontSize: 12, fontWeight: 700, marginLeft: 2 }}>日</small>
+                  </div>
+                </div>
               </div>
-            ))}
-            {monthGrid.cells.map((cell, index) =>
-              cell.day === null ? (
-                <div className="month-cal__day is-empty" key={index} />
-              ) : (
-                <button
-                  type="button"
-                  className={`month-cal__day ${cell.isWork ? "is-work" : "is-off"}`}
-                  key={index}
-                  onClick={() => toggleMonthDay(cell.day as number)}
-                  disabled={saving}
-                >
-                  <span>{cell.day}</span>
+
+              <div className="month-cal">
+                {DOW_LABELS.map((d) => (
+                  <div className="month-cal__dow" key={d}>
+                    {d}
+                  </div>
+                ))}
+                {monthGrid.cells.map((cell, index) =>
+                  cell.day === null ? (
+                    <div className="month-cal__day is-empty" key={index} />
+                  ) : (
+                    <div
+                      className={`month-cal__day ${cell.worked ? "is-work" : "is-off"}`}
+                      key={index}
+                      style={{ cursor: "default" }}
+                    >
+                      <span>{cell.day}</span>
+                      <select
+                        value={cell.deliveryDistrictId ?? ""}
+                        onChange={(e) => setMonthDay(cell.day as number, e.target.value || null)}
+                        disabled={saving}
+                        style={{ backgroundColor: cell.backgroundColor ?? undefined, width: "100%", fontSize: 11 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <option value="">-</option>
+                        {districtOptions.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.code}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                )}
+              </div>
+
+              <div className="month-cal__legend">
+                <span className="flex">
                   <span className="month-cal__mark" />
-                </button>
-              )
-            )}
-          </div>
-
-          <div className="month-cal__legend">
-            <span className="flex">
-              <span className="month-cal__mark" />
-              稼働
-            </span>
-            <span className="flex">
-              <span className="month-cal__mark" style={{ background: "var(--gray-300)" }} />
-              休み
-            </span>
+                  稼働
+                </span>
+                <span className="flex">
+                  <span className="month-cal__mark" style={{ background: "var(--gray-300)" }} />
+                  休み
+                </span>
+              </div>
+            </div>
           </div>
         </Modal>
       )}

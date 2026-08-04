@@ -24,12 +24,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { data, error } = await supabase
     .from("work_schedule_days")
-    .select("work_date, worked")
+    .select("work_date, delivery_district_id")
     .eq("driver_id", driverId)
     .gte("work_date", start)
     .lte("work_date", end);
   if (error) return res.status(500).json({ error: error.message });
 
-  const workedDates = (data ?? []).filter((d) => d.worked).map((d) => d.work_date);
-  return res.status(200).json({ workedDates });
+  const days = (data ?? []).map((d) => ({
+    workDate: d.work_date,
+    deliveryDistrictId: d.delivery_district_id,
+  }));
+  return res.status(200).json({ days });
 }
