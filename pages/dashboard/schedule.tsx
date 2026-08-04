@@ -495,7 +495,7 @@ export default function SchedulePage() {
                     <div className="month-cal__day is-empty" key={index} />
                   ) : (
                     <div
-                      className={`month-cal__day ${cell.worked ? "is-work" : "is-off"}`}
+                      className={`month-cal__day month-cal__day--select ${cell.worked ? "is-work" : "is-off"}`}
                       key={index}
                       style={{ cursor: "default" }}
                     >
@@ -504,8 +504,7 @@ export default function SchedulePage() {
                         value={cell.deliveryDistrictId ?? ""}
                         onChange={(e) => setMonthDay(cell.day as number, e.target.value || null)}
                         disabled={saving}
-                        style={{ backgroundColor: cell.backgroundColor ?? undefined, width: "100%", fontSize: 11 }}
-                        onClick={(e) => e.stopPropagation()}
+                        style={{ backgroundColor: cell.backgroundColor ?? undefined }}
                       >
                         <option value="">-</option>
                         {districtOptions.map((d) => (

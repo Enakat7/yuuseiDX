@@ -1019,6 +1019,18 @@ textarea:focus {
   cursor: pointer;
 }
 
+.month-cal__day--select {
+  aspect-ratio: auto;
+  padding: 8px 4px;
+}
+
+.month-cal__day--select select {
+  width: 100%;
+  padding: 4px 2px;
+  font-size: 11px;
+  text-align: center;
+}
+
 .month-cal__day.is-empty {
   border-color: transparent;
   cursor: default;
