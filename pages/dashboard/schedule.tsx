@@ -249,6 +249,14 @@ export default function SchedulePage() {
             <h2>エリア別 稼働表</h2>
             <p className="content__lead">エリアタブを切り替えて、ドライバーごとの稼働状況を確認します。</p>
           </div>
+          <div className="flex" style={{ gap: 12, alignItems: "center" }}>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={handleExport}>
+              CSVエクスポート
+            </button>
+            <button type="button" className="btn btn--primary btn--sm" onClick={handleBulkSend} disabled={saving}>
+              一括送信
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -299,12 +307,6 @@ export default function SchedulePage() {
             <h3>{area}エリア — 稼働表</h3>
             <div className="flex" style={{ gap: 12, alignItems: "center" }}>
               <span className="text-sm text-muted">{rows.length}名 稼働中</span>
-              <button type="button" className="btn btn--ghost btn--sm" onClick={handleExport}>
-                CSVエクスポート
-              </button>
-              <button type="button" className="btn btn--primary btn--sm" onClick={handleBulkSend} disabled={saving}>
-                一括送信
-              </button>
               <div className="date-nav">
                 <button
                   type="button"
