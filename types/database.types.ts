@@ -1417,6 +1417,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      request_purchase_order_correction: {
+        Args: { p_order_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       user_role: "管理者" | "スタッフ" | "ドライバー"

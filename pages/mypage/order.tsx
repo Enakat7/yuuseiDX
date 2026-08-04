@@ -26,6 +26,7 @@ export default function DriverOrderPage() {
   const [monthYear, setMonthYear] = useState<number | null>(null);
   const [monthMonth, setMonthMonth] = useState<number | null>(null);
   const [approving, setApproving] = useState(false);
+  const [requestingCorrection, setRequestingCorrection] = useState(false);
 
   useEffect(() => {
     // 初回マウント時にAPI経由で発注書一覧を取得する意図的な副作用のため無効化する
@@ -63,6 +64,19 @@ export default function DriverOrderPage() {
       setError(err instanceof Error ? err.message : "承認に失敗しました。");
     } finally {
       setApproving(false);
+    }
+  }
+
+  async function handleRequestCorrection() {
+    if (!openOrderId) return;
+    setRequestingCorrection(true);
+    try {
+      await apiRequest(`/api/me/orders/${openOrderId}/request-correction`, { method: "POST" });
+      setOpenOrderId(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "修正依頼に失敗しました。");
+    } finally {
+      setRequestingCorrection(false);
     }
   }
 
@@ -165,9 +179,24 @@ export default function DriverOrderPage() {
             openOrder.driver_approved_at ? (
               <span className={`pill pill--${APPROVAL_TONE.承認済}`}>承認済</span>
             ) : (
-              <button type="button" className="btn btn--primary btn--sm" onClick={handleApprove} disabled={approving}>
-                {approving ? "承認中..." : "承認する"}
-              </button>
+              <div className="flex" style={{ gap: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={handleRequestCorrection}
+                  disabled={approving || requestingCorrection}
+                >
+                  {requestingCorrection ? "送信中..." : "修正依頼"}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  onClick={handleApprove}
+                  disabled={approving || requestingCorrection}
+                >
+                  {approving ? "承認中..." : "承認する"}
+                </button>
+              </div>
             )
           }
         >
