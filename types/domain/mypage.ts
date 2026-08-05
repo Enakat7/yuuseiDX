@@ -14,7 +14,8 @@ export type MySummary = {
 };
 
 export type MyOrderRow = PurchaseOrder;
-export type MyOrderMonth = { workedDates: string[]; year: number; month: number };
+export type MyOrderMonthDay = { workDate: string; worked: boolean; code: string | null; backgroundColor: string | null };
+export type MyOrderMonth = { days: MyOrderMonthDay[]; year: number; month: number };
 
 export type MyPaymentRow = PaymentNotice;
 export type MyPaymentDetail = PaymentNotice & {

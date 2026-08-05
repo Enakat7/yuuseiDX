@@ -77,7 +77,10 @@ export type MonthDistrictCell = {
   worked: boolean;
 };
 
-export type MonthDistrictEntry = { id: string; code: string; backgroundColor: string; worked: boolean };
+// worked（実績の真偽値）はcode割り当ての有無から独立して保持する。
+// 配達地区コード導入前の履歴データ（worked=trueだがdelivery_district_idがない）
+// でも稼働日数の集計・表示が欠落しないようにするため。
+export type MonthDistrictEntry = Omit<MonthDistrictCell, "day">;
 
 /**
  * Sun-start month grid with a per-day delivery district assignment
@@ -86,7 +89,7 @@ export type MonthDistrictEntry = { id: string; code: string; backgroundColor: st
 export function buildMonthGridFromDistrictMap(
   year: number,
   month: number, // 1-12
-  entries: Map<string, MonthDistrictEntry> // "YYYY-MM-DD" -> assigned district
+  entries: Map<string, MonthDistrictEntry> // "YYYY-MM-DD" -> その日の稼働実績・割当地区
 ): { cells: MonthDistrictCell[]; workCount: number; daysInMonth: number } {
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstWeekday = sundayFirstWeekday(new Date(year, month - 1, 1));
@@ -105,7 +108,7 @@ export function buildMonthGridFromDistrictMap(
     if (entry?.worked) workCount += 1;
     cells.push({
       day,
-      deliveryDistrictId: entry?.id ?? null,
+      deliveryDistrictId: entry?.deliveryDistrictId ?? null,
       code: entry?.code ?? null,
       backgroundColor: entry?.backgroundColor ?? null,
       worked: entry?.worked ?? false,

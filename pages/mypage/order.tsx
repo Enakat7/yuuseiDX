@@ -3,9 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import DriverLayout from "@/components/DriverLayout";
 import Modal from "@/components/Modal";
 import { apiRequest } from "@/lib/apiClient";
-import { buildMonthGridFromDates, DOW_LABELS } from "@/lib/calendar";
+import { buildMonthGridFromDistrictMap, DOW_LABELS, type MonthDistrictEntry } from "@/lib/calendar";
 import { toCsv, downloadCsv } from "@/lib/csv";
-import type { MyOrderRow } from "@/types/domain/mypage";
+import type { MyOrderMonthDay, MyOrderRow } from "@/types/domain/mypage";
 
 const APPROVAL_TONE: Record<string, string> = {
   承認済: "confirmed",
@@ -22,7 +22,7 @@ export default function DriverOrderPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [openOrderId, setOpenOrderId] = useState<string | null>(null);
-  const [monthWorkedDates, setMonthWorkedDates] = useState<Set<string>>(new Set());
+  const [monthDays, setMonthDays] = useState<MyOrderMonthDay[]>([]);
   const [monthYear, setMonthYear] = useState<number | null>(null);
   const [monthMonth, setMonthMonth] = useState<number | null>(null);
   const [approving, setApproving] = useState(false);
@@ -41,10 +41,10 @@ export default function DriverOrderPage() {
   async function openDetail(orderId: string) {
     setOpenOrderId(orderId);
     try {
-      const res = await apiRequest<{ workedDates: string[]; year: number; month: number }>(
+      const res = await apiRequest<{ days: MyOrderMonthDay[]; year: number; month: number }>(
         `/api/me/orders/${orderId}/month`
       );
-      setMonthWorkedDates(new Set(res.workedDates));
+      setMonthDays(res.days);
       setMonthYear(res.year);
       setMonthMonth(res.month);
     } catch (err) {
@@ -99,8 +99,14 @@ export default function DriverOrderPage() {
   const openOrder = orders.find((o) => o.id === openOrderId) ?? null;
   const monthGrid = useMemo(() => {
     if (!openOrder || monthYear === null || monthMonth === null) return null;
-    return buildMonthGridFromDates(monthYear, monthMonth, monthWorkedDates);
-  }, [openOrder, monthYear, monthMonth, monthWorkedDates]);
+    const entries = new Map<string, MonthDistrictEntry>(
+      monthDays.map((d) => [
+        d.workDate,
+        { deliveryDistrictId: null, code: d.code, backgroundColor: d.backgroundColor, worked: d.worked },
+      ])
+    );
+    return buildMonthGridFromDistrictMap(monthYear, monthMonth, entries);
+  }, [openOrder, monthYear, monthMonth, monthDays]);
 
   return (
     <>
@@ -227,9 +233,13 @@ export default function DriverOrderPage() {
               cell.day === null ? (
                 <div className="month-cal__day is-empty" key={index} />
               ) : (
-                <div className={`month-cal__day ${cell.isWork ? "is-work" : "is-off"}`} key={index}>
+                <div
+                  className={`month-cal__day ${cell.worked ? "is-work" : "is-off"}`}
+                  key={index}
+                  style={{ backgroundColor: cell.backgroundColor ?? undefined }}
+                >
                   <span>{cell.day}</span>
-                  <span className="month-cal__mark" />
+                  <span style={{ fontSize: 10, fontWeight: 700 }}>{cell.code ?? "-"}</span>
                 </div>
               )
             )}

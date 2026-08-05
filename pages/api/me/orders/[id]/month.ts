@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireDriver } from "@/lib/apiAuth";
-import type { MyOrderMonth } from "@/types/domain/mypage";
+import type { MyOrderMonth, MyOrderMonthDay } from "@/types/domain/mypage";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
@@ -32,13 +32,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { data, error } = await supabase
     .from("work_schedule_days")
-    .select("work_date, worked")
+    .select("work_date, worked, delivery_district_id")
     .eq("driver_id", driver.id)
     .gte("work_date", start)
     .lte("work_date", end);
   if (error) return res.status(500).json({ error: error.message });
 
-  const workedDates = (data ?? []).filter((d) => d.worked).map((d) => d.work_date);
-  const result: MyOrderMonth = { workedDates, year, month };
+  const districtIds = [...new Set((data ?? []).map((d) => d.delivery_district_id).filter((id): id is string => !!id))];
+  const { data: districts, error: districtError } =
+    districtIds.length > 0
+      ? await supabase.from("delivery_districts").select("id, code, background_color").in("id", districtIds)
+      : { data: [], error: null };
+  if (districtError) return res.status(500).json({ error: districtError.message });
+
+  const districtById = new Map((districts ?? []).map((d) => [d.id, d]));
+
+  const days: MyOrderMonthDay[] = (data ?? []).map((d) => {
+    const district = d.delivery_district_id ? districtById.get(d.delivery_district_id) : undefined;
+    return {
+      workDate: d.work_date,
+      worked: d.worked,
+      code: district?.code ?? null,
+      backgroundColor: district?.background_color ?? null,
+    };
+  });
+
+  const result: MyOrderMonth = { days, year, month };
   return res.status(200).json(result);
 }

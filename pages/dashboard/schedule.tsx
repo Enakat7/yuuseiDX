@@ -44,7 +44,9 @@ export default function SchedulePage() {
   const [periodEnd, setPeriodEnd] = useState(defaultPeriod.end);
 
   const [openDriverId, setOpenDriverId] = useState<string | null>(null);
-  const [monthDays, setMonthDays] = useState<Map<string, string | null>>(new Map());
+  const [monthDays, setMonthDays] = useState<Map<string, { deliveryDistrictId: string | null; worked: boolean }>>(
+    new Map()
+  );
   const [showImportModal, setShowImportModal] = useState(false);
   const [deliveryDistricts, setDeliveryDistricts] = useState<DeliveryDistrictWithArea[]>([]);
 
@@ -136,10 +138,12 @@ export default function SchedulePage() {
     setOpenDriverId(driverId);
     const d = weekStart;
     try {
-      const res = await apiRequest<{ days: { workDate: string; deliveryDistrictId: string | null }[] }>(
-        `/api/schedule/month?driver_id=${driverId}&year=${d.getFullYear()}&month=${d.getMonth() + 1}`
+      const res = await apiRequest<{
+        days: { workDate: string; worked: boolean; deliveryDistrictId: string | null }[];
+      }>(`/api/schedule/month?driver_id=${driverId}&year=${d.getFullYear()}&month=${d.getMonth() + 1}`);
+      setMonthDays(
+        new Map(res.days.map((day) => [day.workDate, { deliveryDistrictId: day.deliveryDistrictId, worked: day.worked }]))
       );
-      setMonthDays(new Map(res.days.map((day) => [day.workDate, day.deliveryDistrictId])));
     } catch (err) {
       setError(err instanceof Error ? err.message : "取得に失敗しました。");
     }
@@ -191,9 +195,10 @@ export default function SchedulePage() {
         method: "POST",
         body: JSON.stringify({ driver_id: openDriverId, work_date: iso, delivery_district_id: deliveryDistrictId }),
       });
+      const worked = deliveryDistrictId ? (districtById.get(deliveryDistrictId)?.area ?? null) !== null : false;
       setMonthDays((prev) => {
         const next = new Map(prev);
-        next.set(iso, deliveryDistrictId);
+        next.set(iso, { deliveryDistrictId, worked });
         return next;
       });
       await loadAll();
@@ -254,15 +259,13 @@ export default function SchedulePage() {
   const monthGrid = useMemo(() => {
     if (!openDriver) return null;
     const entries = new Map<string, MonthDistrictEntry>();
-    for (const [iso, districtId] of monthDays) {
-      if (!districtId) continue;
-      const district = districtById.get(districtId);
-      if (!district) continue;
+    for (const [iso, day] of monthDays) {
+      const district = day.deliveryDistrictId ? districtById.get(day.deliveryDistrictId) : undefined;
       entries.set(iso, {
-        id: district.id,
-        code: district.code,
-        backgroundColor: district.background_color,
-        worked: district.area !== null,
+        deliveryDistrictId: day.deliveryDistrictId,
+        code: district?.code ?? null,
+        backgroundColor: district?.background_color ?? null,
+        worked: day.worked,
       });
     }
     return buildMonthGridFromDistrictMap(weekStart.getFullYear(), weekStart.getMonth() + 1, entries);
