@@ -278,7 +278,7 @@ export default function SchedulePage() {
             <button type="button" className="btn btn--ghost btn--sm" onClick={handleExport}>
               CSVエクスポート
             </button>
-            <button type="button" className="btn btn--primary btn--sm" onClick={handleBulkSend} disabled={saving}>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={handleBulkSend} disabled={saving}>
               一括送信
             </button>
           </div>
@@ -396,7 +396,7 @@ export default function SchedulePage() {
           onClose={handleCloseCalendar}
           wide
           headerAction={
-            <button type="button" className="btn btn--primary btn--sm" onClick={handleConfirmOrder} disabled={saving}>
+            <button type="button" className="btn btn--ghost btn--sm" onClick={handleConfirmOrder} disabled={saving}>
               確定
             </button>
           }

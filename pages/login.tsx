@@ -169,7 +169,7 @@ export default function LoginPage() {
                 {error}
               </p>
             )}
-            <button type="submit" className="btn btn--primary btn--block" disabled={submitting || isLocked}>
+            <button type="submit" className="btn btn--ghost btn--block" disabled={submitting || isLocked}>
               {permanentlyLocked
                 ? ""
                 : lockedUntil !== null

@@ -1306,7 +1306,7 @@ export default function MasterDriverPage() {
             </p>
             <DriverGasCardFields fields={form} editing onChange={(patch) => setForm((f) => ({ ...f, ...patch }))} />
 
-            <button type="submit" className="btn btn--primary btn--block" style={{ marginTop: 18 }} disabled={saving}>
+            <button type="submit" className="btn btn--ghost btn--block" style={{ marginTop: 18 }} disabled={saving}>
               {saving ? "登録中..." : "登録する"}
             </button>
           </form>
@@ -1325,7 +1325,7 @@ export default function MasterDriverPage() {
                 <button type="button" className="btn btn--ghost btn--sm" onClick={handleCancelEdit} disabled={saving}>
                   キャンセル
                 </button>
-                <button type="button" className="btn btn--primary btn--sm" onClick={handleSaveEdit} disabled={saving}>
+                <button type="button" className="btn btn--ghost btn--sm" onClick={handleSaveEdit} disabled={saving}>
                   {saving ? "保存中..." : "保存"}
                 </button>
               </div>
@@ -1420,7 +1420,7 @@ export default function MasterDriverPage() {
                     />
                     <button
                       type="button"
-                      className="btn btn--primary btn--sm"
+                      className="btn btn--ghost btn--sm"
                       disabled={saving || !passwordInput}
                       onClick={showAccountForm ? handleIssueAccount : handleResetPassword}
                     >

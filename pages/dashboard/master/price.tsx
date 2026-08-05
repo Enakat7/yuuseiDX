@@ -267,7 +267,7 @@ export default function MasterPricePage() {
           <button className="btn btn--ghost" onClick={loadAll}>
             変更を破棄
           </button>
-          <button className="btn btn--primary" onClick={handleSave} disabled={saving}>
+          <button className="btn btn--ghost" onClick={handleSave} disabled={saving}>
             {saving ? "保存中..." : "単価マスタを保存"}
           </button>
         </div>

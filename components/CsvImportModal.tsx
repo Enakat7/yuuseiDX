@@ -52,7 +52,7 @@ export default function CsvImportModal({ title = "CSVインポート", descripti
           )}
           <button
             type="button"
-            className="btn btn--primary btn--block"
+            className="btn btn--ghost btn--block"
             onClick={handleImport}
             disabled={!file || importing}
           >

@@ -375,7 +375,7 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
-            <button type="submit" className="btn btn--primary btn--block" disabled={saving}>
+            <button type="submit" className="btn btn--ghost btn--block" disabled={saving}>
               {saving ? "作成中..." : "作成する"}
             </button>
           </form>

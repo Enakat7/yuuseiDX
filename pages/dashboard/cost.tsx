@@ -394,7 +394,7 @@ export default function CostPage() {
           headerAction={
             <button
               type="button"
-              className="btn btn--primary btn--sm"
+              className="btn btn--ghost btn--sm"
               onClick={handleBulkAdd}
               disabled={saving || !newRows.some((row) => row.driverId)}
             >

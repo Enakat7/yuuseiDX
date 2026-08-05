@@ -197,7 +197,7 @@ export default function DriverOrderPage() {
                 </button>
                 <button
                   type="button"
-                  className="btn btn--primary btn--sm"
+                  className="btn btn--ghost btn--sm"
                   onClick={handleApprove}
                   disabled={approving || requestingCorrection}
                 >

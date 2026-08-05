@@ -294,7 +294,7 @@ export default function DriverPaymentPage() {
                 ) : (
                   <button
                     type="button"
-                    className="btn btn--primary btn--block"
+                    className="btn btn--ghost btn--block"
                     onClick={() => handleAcknowledge([detail.id])}
                     disabled={saving}
                   >

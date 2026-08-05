@@ -372,11 +372,6 @@ img {
   box-shadow: 0 0 0 var(--black);
 }
 
-.btn--primary {
-  background: var(--black);
-  color: var(--white);
-}
-
 .btn--ghost {
   box-shadow: none;
   border-color: var(--gray-300);

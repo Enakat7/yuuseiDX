@@ -180,7 +180,7 @@ export default function MasterDeliveryTypePage() {
                     単価マスタ対象にする
                   </label>
                 </div>
-                <button type="submit" className="btn btn--primary" disabled={saving}>
+                <button type="submit" className="btn btn--ghost" disabled={saving}>
                   {saving ? "登録中..." : "登録する"}
                 </button>
               </form>

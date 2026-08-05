@@ -18,7 +18,7 @@ export default function OperationDashboardPage() {
             <h2>2026年7月 サマリー</h2>
             <p className="content__lead">全エリア・全ドライバーの集計状況です。</p>
           </div>
-          <Link href="/dashboard/aggregation" className="btn btn--primary">
+          <Link href="/dashboard/aggregation" className="btn btn--ghost">
             集計を確認する →
           </Link>
         </div>

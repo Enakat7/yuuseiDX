@@ -272,7 +272,7 @@ export default function AdvancePage() {
               onChange={(e) => setNote(e.target.value)}
             />
           </div>
-          <button className="btn btn--primary btn--block" onClick={handleCreate} disabled={saving}>
+          <button className="btn btn--ghost btn--block" onClick={handleCreate} disabled={saving}>
             {saving ? "作成中..." : "前払依頼書を作成"}
           </button>
         </Modal>
