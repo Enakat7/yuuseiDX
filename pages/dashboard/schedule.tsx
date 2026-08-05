@@ -197,7 +197,8 @@ export default function SchedulePage() {
         next.set(iso, { deliveryDistrictId, worked });
         return next;
       });
-      await loadAll();
+      // 背景の稼働表への反映はモーダルを閉じる時にまとめて行うため、
+      // ここでは呼ばない（1マスごとの全件再取得を避ける）。
     } catch (err) {
       showToast(err instanceof Error ? err.message : "更新に失敗しました。", "error");
     } finally {
