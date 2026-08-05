@@ -334,12 +334,12 @@ export default function SchedulePage() {
             <table className="schedule-table">
               <thead>
                 <tr>
-                  <th className="schedule-table__sticky-left">ドライバー</th>
+                  <th className="schedule-table__sticky-left-1">ドライバー</th>
+                  <th className="schedule-table__sticky-left-2">発注書状況</th>
+                  <th className="schedule-table__sticky-left-3"></th>
                   {dateColumns.map((d) => (
                     <th key={d.iso}>{d.label}</th>
                   ))}
-                  <th className="schedule-table__sticky-right-2">発注書状況</th>
-                  <th className="schedule-table__sticky-right-1"></th>
                 </tr>
               </thead>
               <tbody>
@@ -354,7 +354,17 @@ export default function SchedulePage() {
                   const status = driver.orderStatus ?? "未作成";
                   return (
                     <tr key={driver.driverId}>
-                      <td className="schedule-table__sticky-left">{driver.driverName}</td>
+                      <td className="schedule-table__sticky-left-1">
+                        <span className="schedule-table__driver-name">{driver.driverName}</span>
+                      </td>
+                      <td className="schedule-table__sticky-left-2">
+                        <span className={`pill pill--${STATUS_TONE[status]}`}>{STATUS_LABEL[status]}</span>
+                      </td>
+                      <td className="schedule-table__sticky-left-3">
+                        <button type="button" className="btn btn--sm" onClick={() => openDetail(driver.driverId)}>
+                          詳細
+                        </button>
+                      </td>
                       {driver.days.map((cell, index) => (
                         <td key={index}>
                           <select
@@ -372,14 +382,6 @@ export default function SchedulePage() {
                           </select>
                         </td>
                       ))}
-                      <td className="schedule-table__sticky-right-2">
-                        <span className={`pill pill--${STATUS_TONE[status]}`}>{STATUS_LABEL[status]}</span>
-                      </td>
-                      <td className="schedule-table__sticky-right-1">
-                        <button type="button" className="btn btn--sm" onClick={() => openDetail(driver.driverId)}>
-                          詳細
-                        </button>
-                      </td>
                     </tr>
                   );
                 })}
