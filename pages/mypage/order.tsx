@@ -72,6 +72,7 @@ export default function DriverOrderPage() {
     setRequestingCorrection(true);
     try {
       await apiRequest(`/api/me/orders/${openOrderId}/request-correction`, { method: "POST" });
+      setOrders((prev) => prev.filter((o) => o.id !== openOrderId));
       setOpenOrderId(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "修正依頼に失敗しました。");
