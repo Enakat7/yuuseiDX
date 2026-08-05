@@ -553,6 +553,48 @@ img {
   overflow-x: auto;
 }
 
+/* ---------- 稼働表（月表示）: ドライバー列・右端2列は固定し、日付列だけ横スクロールする ---------- */
+
+.schedule-table {
+  width: max-content;
+  min-width: 100%;
+}
+
+.schedule-table__sticky-left,
+.schedule-table__sticky-right-1,
+.schedule-table__sticky-right-2 {
+  position: sticky;
+  z-index: 2;
+}
+
+.schedule-table__sticky-left {
+  left: 0;
+  border-right: var(--border-w-sm) solid var(--black);
+}
+
+.schedule-table__sticky-right-2 {
+  right: 100px;
+  border-left: var(--border-w-sm) solid var(--black);
+}
+
+.schedule-table__sticky-right-1 {
+  right: 0;
+  width: 100px;
+}
+
+thead .schedule-table__sticky-left,
+thead .schedule-table__sticky-right-1,
+thead .schedule-table__sticky-right-2 {
+  z-index: 3;
+  background: var(--black);
+}
+
+tbody .schedule-table__sticky-left,
+tbody .schedule-table__sticky-right-1,
+tbody .schedule-table__sticky-right-2 {
+  background: var(--white);
+}
+
 table {
   width: 100%;
   border-collapse: collapse;

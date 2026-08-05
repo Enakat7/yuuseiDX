@@ -8,7 +8,7 @@ import { buildMonthGridFromDistrictMap, DOW_LABELS, type MonthDistrictEntry } fr
 import { AREA_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
-import { addDays, getWeekDates, getWeekStartSunday, toIsoDate } from "@/lib/date";
+import { addMonths, getMonthDates, toIsoDate } from "@/lib/date";
 import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import { useToast } from "@/lib/useToast";
 import type { ScheduleRow } from "@/types/domain/schedule";
@@ -34,9 +34,9 @@ function nextMonthRange(): { start: string; end: string } {
 
 export default function SchedulePage() {
   const [area, setArea] = useState<(typeof AREA_TABS)[number]>("西");
-  const [weekStart, setWeekStart] = useState(() => new Date(getWeekStartSunday(new Date())));
+  const [monthAnchor, setMonthAnchor] = useState(() => addMonths(new Date(), 0));
   const [rows, setRows] = useState<ScheduleRow[]>([]);
-  const [weekDates, setWeekDates] = useState(() => getWeekDates(weekStart));
+  const [dateColumns, setDateColumns] = useState(() => getMonthDates(monthAnchor));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const { toast, showToast, hideToast } = useToast();
@@ -69,15 +69,15 @@ export default function SchedulePage() {
     try {
       const params = new URLSearchParams({
         area,
-        week_start: toIsoDate(weekStart),
+        month_start: toIsoDate(monthAnchor),
         period_start: periodStart,
         period_end: periodEnd,
       });
-      const res = await apiRequest<{ data: ScheduleRow[]; weekDates: { iso: string; label: string }[] }>(
+      const res = await apiRequest<{ data: ScheduleRow[]; dateColumns: { iso: string; label: string }[] }>(
         `/api/schedule?${params.toString()}`
       );
       setRows(res.data);
-      setWeekDates(res.weekDates);
+      setDateColumns(res.dateColumns);
     } catch (err) {
       showToast(err instanceof Error ? err.message : "取得に失敗しました。", "error");
     } finally {
@@ -86,11 +86,11 @@ export default function SchedulePage() {
   }
 
   useEffect(() => {
-    // エリア/週/対象期間切替時にAPI経由で再取得する意図的な副作用のため無効化する
+    // エリア/月/対象期間切替時にAPI経由で再取得する意図的な副作用のため無効化する
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [area, weekStart, periodStart, periodEnd]);
+  }, [area, monthAnchor, periodStart, periodEnd]);
 
   async function setDay(driverId: string, dayIndex: number, deliveryDistrictId: string | null) {
     setSaving(true);
@@ -99,7 +99,7 @@ export default function SchedulePage() {
         method: "POST",
         body: JSON.stringify({
           driver_id: driverId,
-          work_date: weekDates[dayIndex].iso,
+          work_date: dateColumns[dayIndex].iso,
           delivery_district_id: deliveryDistrictId,
         }),
       });
@@ -134,7 +134,7 @@ export default function SchedulePage() {
 
   async function openDetail(driverId: string) {
     setOpenDriverId(driverId);
-    const d = weekStart;
+    const d = monthAnchor;
     try {
       const res = await apiRequest<{
         days: { workDate: string; worked: boolean; deliveryDistrictId: string | null }[];
@@ -182,8 +182,8 @@ export default function SchedulePage() {
 
   async function setMonthDay(day: number, deliveryDistrictId: string | null) {
     if (!openDriverId) return;
-    const year = weekStart.getFullYear();
-    const month = weekStart.getMonth() + 1;
+    const year = monthAnchor.getFullYear();
+    const month = monthAnchor.getMonth() + 1;
     const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     setSaving(true);
     try {
@@ -208,31 +208,31 @@ export default function SchedulePage() {
   function handleExport() {
     const csvRows = rows.map((row) => {
       const base: Record<string, string> = { driver: row.driverName };
-      weekDates.forEach((d, index) => {
-        base[d.label] = row.week[index].code ?? "-";
+      dateColumns.forEach((d, index) => {
+        base[d.label] = row.days[index].code ?? "-";
       });
       base["発注書状況"] = STATUS_LABEL[row.orderStatus ?? "未作成"];
       return base;
     });
     const csv = toCsv(csvRows, [
       { key: "driver", header: "ドライバー" },
-      ...weekDates.map((d) => ({ key: d.label as keyof (typeof csvRows)[number], header: d.label })),
+      ...dateColumns.map((d) => ({ key: d.label as keyof (typeof csvRows)[number], header: d.label })),
       { key: "発注書状況", header: "発注書状況" },
     ]);
-    downloadCsv(`稼働表_${area}_${toIsoDate(weekStart)}.csv`, csv);
+    downloadCsv(`稼働表_${area}_${toIsoDate(monthAnchor)}.csv`, csv);
   }
 
   async function handleImportFile(file: File) {
     const parsedRows = await parseCsv<Record<string, string>>(file, [
       { key: "driver", header: "ドライバー" },
-      ...weekDates.map((d) => ({ key: d.label, header: d.label })),
+      ...dateColumns.map((d) => ({ key: d.label, header: d.label })),
     ]);
 
     let count = 0;
     for (const parsedRow of parsedRows) {
       const row = rows.find((r) => r.driverName === parsedRow.driver);
       if (!row) continue;
-      for (const d of weekDates) {
+      for (const d of dateColumns) {
         const raw = parsedRow[d.label];
         if (raw === undefined || raw === "") continue;
         const code = raw.trim();
@@ -264,8 +264,8 @@ export default function SchedulePage() {
         worked: day.worked,
       });
     }
-    return buildMonthGridFromDistrictMap(weekStart.getFullYear(), weekStart.getMonth() + 1, entries);
-  }, [openDriver, monthDays, districtById, weekStart]);
+    return buildMonthGridFromDistrictMap(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, entries);
+  }, [openDriver, monthDays, districtById, monthAnchor]);
 
   return (
     <>
@@ -313,19 +313,17 @@ export default function SchedulePage() {
                 <button
                   type="button"
                   className="date-nav__btn"
-                  aria-label="前週"
-                  onClick={() => setWeekStart((d) => addDays(d, -7))}
+                  aria-label="前月"
+                  onClick={() => setMonthAnchor((d) => addMonths(d, -1))}
                 >
                   ‹
                 </button>
-                <span className="date-nav__value">
-                  {weekDates[0]?.label}〜{weekDates[6]?.label}
-                </span>
+                <span className="date-nav__value">{monthAnchor.getMonth() + 1}月</span>
                 <button
                   type="button"
                   className="date-nav__btn"
-                  aria-label="翌週"
-                  onClick={() => setWeekStart((d) => addDays(d, 7))}
+                  aria-label="翌月"
+                  onClick={() => setMonthAnchor((d) => addMonths(d, 1))}
                 >
                   ›
                 </button>
@@ -333,21 +331,21 @@ export default function SchedulePage() {
             </div>
           </div>
           <div className="table-wrap">
-            <table>
+            <table className="schedule-table">
               <thead>
                 <tr>
-                  <th>ドライバー</th>
-                  {weekDates.map((d) => (
+                  <th className="schedule-table__sticky-left">ドライバー</th>
+                  {dateColumns.map((d) => (
                     <th key={d.iso}>{d.label}</th>
                   ))}
-                  <th>発注書状況</th>
-                  <th></th>
+                  <th className="schedule-table__sticky-right-2">発注書状況</th>
+                  <th className="schedule-table__sticky-right-1"></th>
                 </tr>
               </thead>
               <tbody>
                 {!loading && rows.length === 0 && (
                   <tr>
-                    <td colSpan={10}>
+                    <td colSpan={dateColumns.length + 3}>
                       <p className="empty-note">このエリアの稼働表データはまだありません。</p>
                     </td>
                   </tr>
@@ -356,8 +354,8 @@ export default function SchedulePage() {
                   const status = driver.orderStatus ?? "未作成";
                   return (
                     <tr key={driver.driverId}>
-                      <td>{driver.driverName}</td>
-                      {driver.week.map((cell, index) => (
+                      <td className="schedule-table__sticky-left">{driver.driverName}</td>
+                      {driver.days.map((cell, index) => (
                         <td key={index}>
                           <select
                             value={cell.deliveryDistrictId ?? ""}
@@ -374,10 +372,10 @@ export default function SchedulePage() {
                           </select>
                         </td>
                       ))}
-                      <td>
+                      <td className="schedule-table__sticky-right-2">
                         <span className={`pill pill--${STATUS_TONE[status]}`}>{STATUS_LABEL[status]}</span>
                       </td>
-                      <td>
+                      <td className="schedule-table__sticky-right-1">
                         <button type="button" className="btn btn--sm" onClick={() => openDetail(driver.driverId)}>
                           詳細
                         </button>
@@ -396,7 +394,7 @@ export default function SchedulePage() {
           title={`${openDriver.driverName} — 稼働カレンダー`}
           subtitle={`${area}エリア${
             openDriver.districtNames.length > 0 ? ` / ${openDriver.districtNames.join("・")}` : ""
-          } ／ ${weekStart.getFullYear()}年${weekStart.getMonth() + 1}月`}
+          } ／ ${monthAnchor.getFullYear()}年${monthAnchor.getMonth() + 1}月`}
           onClose={handleCloseCalendar}
           wide
           headerAction={
@@ -464,7 +462,7 @@ export default function SchedulePage() {
                 ))}
                 {monthGrid.cells.map((cell, index) =>
                   cell.day === null ? (
-                    <div className="month-cal__day is-empty" key={index} />
+                    <div className="month-cal__day month-cal__day--select is-empty" key={index} />
                   ) : (
                     <div
                       className={`month-cal__day month-cal__day--select ${cell.worked ? "is-work" : "is-off"}`}
@@ -508,7 +506,7 @@ export default function SchedulePage() {
       {showImportModal && (
         <CsvImportModal
           title="発注書(稼働表) CSVインポート"
-          description="表示中の週に取り込みます。列: ドライバー・（曜日ラベルを列見出しとした配達地区コード/-）"
+          description="表示中の月に取り込みます。列: ドライバー・（日付ラベルを列見出しとした配達地区コード/-）"
           onImport={handleImportFile}
           onClose={() => setShowImportModal(false)}
         />

@@ -27,12 +27,6 @@ export function getWeekRange(date: Date): { start: string; end: string } {
   return { start: toIsoDate(start), end: toIsoDate(end) };
 }
 
-// 日曜始まりの週の開始日（ISO文字列）を返す（稼働表の日付カラム表示用）
-export function getWeekStartSunday(date: Date): string {
-  const start = addDays(date, -date.getDay());
-  return toIsoDate(start);
-}
-
 // 月初・月末（ISO文字列）を返す
 export function getMonthRange(date: Date): { start: string; end: string } {
   const start = new Date(date.getFullYear(), date.getMonth(), 1);
@@ -42,10 +36,16 @@ export function getMonthRange(date: Date): { start: string; end: string } {
 
 const DOW_LABELS_JA = ["日", "月", "火", "水", "木", "金", "土"];
 
-// 月曜始まりの週の7日分（ISO文字列と表示ラベル "M/D(曜)"）を返す
-export function getWeekDates(weekStart: Date): { iso: string; label: string }[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = addDays(weekStart, i);
+// 月初日を指定した月数だけずらす（日は常に1日に正規化する。稼働表の月送り用）
+export function addMonths(monthAnchor: Date, delta: number): Date {
+  return new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + delta, 1);
+}
+
+// 月内の全日分（ISO文字列と表示ラベル "M/D(曜)"）を返す（稼働表の月表示用）
+export function getMonthDates(monthAnchor: Date): { iso: string; label: string }[] {
+  const daysInMonth = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth() + 1, 0).getDate();
+  return Array.from({ length: daysInMonth }, (_, i) => {
+    const d = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), i + 1);
     return { iso: toIsoDate(d), label: `${d.getMonth() + 1}/${d.getDate()}(${DOW_LABELS_JA[d.getDay()]})` };
   });
 }

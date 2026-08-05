@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { requireStaffOrAdmin } from "@/lib/apiAuth";
-import { getWeekDates } from "@/lib/date";
+import { getMonthDates } from "@/lib/date";
 import type { ScheduleDayCell, ScheduleRow } from "@/types/domain/schedule";
 
 type DriverRow = {
@@ -23,16 +23,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { supabase } = auth;
 
   const area = req.query.area;
-  const weekStart = req.query.week_start;
+  const monthStart = req.query.month_start;
   const periodStart = req.query.period_start;
   const periodEnd = req.query.period_end;
-  if (typeof area !== "string" || typeof weekStart !== "string" || typeof periodStart !== "string" || typeof periodEnd !== "string") {
-    return res.status(400).json({ error: "area・week_start・period_start・period_endは必須です。" });
+  if (
+    typeof area !== "string" ||
+    typeof monthStart !== "string" ||
+    typeof periodStart !== "string" ||
+    typeof periodEnd !== "string"
+  ) {
+    return res.status(400).json({ error: "area・month_start・period_start・period_endは必須です。" });
   }
 
   const { data: areaRow, error: areaError } = await supabase.from("areas").select("id").eq("name", area).single();
   if (areaError || !areaRow) {
-    return res.status(200).json({ data: [], weekDates: getWeekDates(new Date(weekStart)) });
+    return res.status(200).json({ data: [], dateColumns: getMonthDates(new Date(monthStart)) });
   }
 
   const { data: drivers, error: driverError } = await supabase
@@ -44,7 +49,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (driverError) return res.status(500).json({ error: driverError.message });
 
   const driverIds = ((drivers as unknown as DriverRow[] | null) ?? []).map((d) => d.id);
-  const weekDates = getWeekDates(new Date(weekStart));
+  const dateColumns = getMonthDates(new Date(monthStart));
 
   const [{ data: days, error: dayError }, { data: orders, error: orderError }, { data: districts, error: districtError }] =
     await Promise.all([
@@ -52,8 +57,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .from("work_schedule_days")
         .select("driver_id, work_date, worked, delivery_district_id")
         .in("driver_id", driverIds.length > 0 ? driverIds : ["00000000-0000-0000-0000-000000000000"])
-        .gte("work_date", weekDates[0].iso)
-        .lte("work_date", weekDates[6].iso),
+        .gte("work_date", dateColumns[0].iso)
+        .lte("work_date", dateColumns[dateColumns.length - 1].iso),
       supabase
         .from("purchase_orders")
         .select("id, driver_id, status")
@@ -91,7 +96,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       driverId: driver.id,
       driverName: driver.name,
       districtNames: driver.driver_districts.map((dd) => dd.district?.name).filter((n): n is string => !!n),
-      week: weekDates.map((d): ScheduleDayCell => {
+      days: dateColumns.map((d): ScheduleDayCell => {
         const day = dayMap.get(d.iso);
         if (!day?.delivery_district_id) return emptyCell;
         const district = districtById.get(day.delivery_district_id);
@@ -103,5 +108,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
   });
 
-  return res.status(200).json({ data: rows, weekDates });
+  return res.status(200).json({ data: rows, dateColumns });
 }
