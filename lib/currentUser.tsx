@@ -54,6 +54,12 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
   );
 }
 
+// ログインページの「キャッシュをクリア」操作等、Provider外から
+// localStorageのキャッシュだけを消したい場合に使う。
+export function clearStoredCurrentUser() {
+  window.localStorage.removeItem(STORAGE_KEY);
+}
+
 export function useCurrentUser() {
   const ctx = useContext(CurrentUserContext);
   if (!ctx) {

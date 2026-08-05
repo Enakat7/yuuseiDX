@@ -1,7 +1,7 @@
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { useEffect, useState, type FormEvent } from "react";
-import { useCurrentUser } from "@/lib/currentUser";
+import { clearStoredCurrentUser, useCurrentUser } from "@/lib/currentUser";
 
 const GENERIC_ERROR = "ログインIDまたはパスワードが正しくありません。";
 
@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [lockedUntil, setLockedUntil] = useState<number | null>(null);
   const [permanentlyLocked, setPermanentlyLocked] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+  const [clearing, setClearing] = useState(false);
 
   const isLocked = permanentlyLocked || (lockedUntil !== null && now < lockedUntil);
 
@@ -106,6 +107,19 @@ export default function LoginPage() {
     }
   };
 
+  const handleClearSession = async () => {
+    if (clearing) return;
+    setClearing(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Cookieのクリアに失敗しても、ローカルの状態はリロードで初期化されるため無視する
+    } finally {
+      clearStoredCurrentUser();
+      window.location.reload();
+    }
+  };
+
   return (
     <>
       <Head>
@@ -165,6 +179,16 @@ export default function LoginPage() {
                     : "ログイン"}
             </button>
           </form>
+
+          <button
+            type="button"
+            className="btn btn--ghost btn--block btn--sm"
+            style={{ marginTop: 12 }}
+            onClick={handleClearSession}
+            disabled={clearing}
+          >
+            {clearing ? "クリア中..." : "キャッシュ・セッションをクリア"}
+          </button>
         </div>
       </div>
     </>
