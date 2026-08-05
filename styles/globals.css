@@ -1242,3 +1242,46 @@ textarea:focus {
 .log-entry__body strong {
   font-weight: 900;
 }
+
+/* ---------- Toast ---------- */
+
+.toast {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 360px;
+  padding: 14px 20px;
+  background: var(--white);
+  border: var(--border-w) solid var(--black);
+  box-shadow: var(--shadow);
+  font-size: 13px;
+  font-weight: 700;
+  animation: toast-in 0.15s ease-out;
+}
+
+.toast::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  background: var(--black);
+}
+
+.toast--error::before {
+  background: repeating-linear-gradient(45deg, var(--black), var(--black) 2px, var(--white) 2px, var(--white) 4px);
+}
+
+@keyframes toast-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

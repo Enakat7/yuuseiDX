@@ -3,12 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import Modal from "@/components/Modal";
 import CsvImportModal from "@/components/CsvImportModal";
+import Toast from "@/components/Toast";
 import { buildMonthGridFromDistrictMap, DOW_LABELS, type MonthDistrictEntry } from "@/lib/calendar";
 import { AREA_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import { addDays, getWeekDates, getWeekStartSunday, toIsoDate } from "@/lib/date";
 import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
+import { useToast } from "@/lib/useToast";
 import type { ScheduleRow } from "@/types/domain/schedule";
 import type { DeliveryDistrictWithArea } from "@/types/domain/master";
 
@@ -37,11 +39,9 @@ export default function SchedulePage() {
   const [weekDates, setWeekDates] = useState(() => getWeekDates(weekStart));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const { toast, showToast } = useToast();
 
-  const defaultPeriod = useMemo(() => nextMonthRange(), []);
-  const [periodStart, setPeriodStart] = useState(defaultPeriod.start);
-  const [periodEnd, setPeriodEnd] = useState(defaultPeriod.end);
+  const { start: periodStart, end: periodEnd } = useMemo(() => nextMonthRange(), []);
 
   const [openDriverId, setOpenDriverId] = useState<string | null>(null);
   const [monthDays, setMonthDays] = useState<Map<string, { deliveryDistrictId: string | null; worked: boolean }>>(
@@ -54,8 +54,8 @@ export default function SchedulePage() {
     // マスタ一覧は稼働表の日別セル選択肢として使うだけなので初回のみ取得する
     apiRequest<{ data: DeliveryDistrictWithArea[] }>("/api/master/delivery-districts")
       .then((res) => setDeliveryDistricts(res.data))
-      .catch((err) => setError(err instanceof Error ? err.message : "配達地区の取得に失敗しました。"));
-  }, []);
+      .catch((err) => showToast(err instanceof Error ? err.message : "配達地区の取得に失敗しました。", "error"));
+  }, [showToast]);
 
   const districtOptions = useMemo(
     () => deliveryDistricts.filter((d) => d.area === null || d.area.name === area),
@@ -66,7 +66,6 @@ export default function SchedulePage() {
 
   async function loadAll() {
     setLoading(true);
-    setError(null);
     try {
       const params = new URLSearchParams({
         area,
@@ -80,7 +79,7 @@ export default function SchedulePage() {
       setRows(res.data);
       setWeekDates(res.weekDates);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "取得に失敗しました。");
+      showToast(err instanceof Error ? err.message : "取得に失敗しました。", "error");
     } finally {
       setLoading(false);
     }
@@ -95,7 +94,6 @@ export default function SchedulePage() {
 
   async function setDay(driverId: string, dayIndex: number, deliveryDistrictId: string | null) {
     setSaving(true);
-    setError(null);
     try {
       await apiRequest("/api/schedule/days", {
         method: "POST",
@@ -107,7 +105,7 @@ export default function SchedulePage() {
       });
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "更新に失敗しました。");
+      showToast(err instanceof Error ? err.message : "更新に失敗しました。", "error");
     } finally {
       setSaving(false);
     }
@@ -116,19 +114,19 @@ export default function SchedulePage() {
   async function handleBulkSend() {
     const driverIds = rows.filter((r) => r.orderStatus === "作成済").map((r) => r.driverId);
     if (driverIds.length === 0) {
-      setError("作成済の発注書がありません。");
+      showToast("作成済の発注書がありません。", "error");
       return;
     }
     setSaving(true);
-    setError(null);
     try {
-      await apiRequest("/api/schedule/orders/send", {
+      const res = await apiRequest<{ sent: number }>("/api/schedule/orders/send", {
         method: "POST",
         body: JSON.stringify({ driver_ids: driverIds, period_start: periodStart, period_end: periodEnd }),
       });
       await loadAll();
+      showToast(`${res.sent}件の発注書を送信しました。`, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "送信に失敗しました。");
+      showToast(err instanceof Error ? err.message : "送信に失敗しました。", "error");
     } finally {
       setSaving(false);
     }
@@ -145,7 +143,7 @@ export default function SchedulePage() {
         new Map(res.days.map((day) => [day.workDate, { deliveryDistrictId: day.deliveryDistrictId, worked: day.worked }]))
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "取得に失敗しました。");
+      showToast(err instanceof Error ? err.message : "取得に失敗しました。", "error");
     }
   }
 
@@ -159,13 +157,12 @@ export default function SchedulePage() {
   async function handleConfirmOrder() {
     if (!openDriverId) return;
     setSaving(true);
-    setError(null);
     try {
       await setOrderStatus(openDriverId, "作成済");
       setOpenDriverId(null);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "確定に失敗しました。");
+      showToast(err instanceof Error ? err.message : "確定に失敗しました。", "error");
     } finally {
       setSaving(false);
     }
@@ -179,7 +176,7 @@ export default function SchedulePage() {
       await setOrderStatus(driverId, "作成中");
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "更新に失敗しました。");
+      showToast(err instanceof Error ? err.message : "更新に失敗しました。", "error");
     }
   }
 
@@ -189,7 +186,6 @@ export default function SchedulePage() {
     const month = weekStart.getMonth() + 1;
     const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     setSaving(true);
-    setError(null);
     try {
       await apiRequest("/api/schedule/days", {
         method: "POST",
@@ -203,7 +199,7 @@ export default function SchedulePage() {
       });
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "更新に失敗しました。");
+      showToast(err instanceof Error ? err.message : "更新に失敗しました。", "error");
     } finally {
       setSaving(false);
     }
@@ -289,33 +285,6 @@ export default function SchedulePage() {
             <button type="button" className="btn btn--primary btn--sm" onClick={handleBulkSend} disabled={saving}>
               一括送信
             </button>
-          </div>
-        </div>
-
-        {error && (
-          <p className="text-sm" style={{ color: "var(--black)", marginBottom: 12 }}>
-            {error}
-          </p>
-        )}
-
-        <div className="panel" style={{ marginBottom: 22 }}>
-          <div className="panel__head">
-            <h3>発注書の対象期間</h3>
-          </div>
-          <div className="panel__body">
-            <div className="field-row">
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label htmlFor="period-start">対象期間開始</label>
-                <input id="period-start" type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} />
-              </div>
-              <div className="field" style={{ marginBottom: 0 }}>
-                <label htmlFor="period-end">対象期間終了</label>
-                <input id="period-end" type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} />
-              </div>
-            </div>
-            <p className="text-sm text-muted" style={{ marginTop: 8 }}>
-              稼働カレンダーで「確定」すると発注書が作成済になります。稼働内容の変更後は自動的に「作成中」に戻ります。
-            </p>
           </div>
         </div>
 
@@ -544,6 +513,8 @@ export default function SchedulePage() {
           onClose={() => setShowImportModal(false)}
         />
       )}
+
+      <Toast toast={toast} />
     </>
   );
 }
