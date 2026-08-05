@@ -8,7 +8,7 @@ import { buildMonthGridFromDistrictMap, DOW_LABELS, type MonthDistrictEntry } fr
 import { AREA_TABS } from "@/lib/constants";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
-import { addMonths, getMonthDates, toIsoDate } from "@/lib/date";
+import { addMonths, getMonthDates, getMonthRange, toIsoDate } from "@/lib/date";
 import { useCsvImportShortcut } from "@/lib/useCsvImportShortcut";
 import { useToast } from "@/lib/useToast";
 import type { ScheduleRow } from "@/types/domain/schedule";
@@ -25,13 +25,6 @@ const STATUS_TONE: Record<string, string> = {
   作成済: "confirmed",
 };
 
-function nextMonthRange(): { start: string; end: string } {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 2, 0);
-  return { start: toIsoDate(start), end: toIsoDate(end) };
-}
-
 export default function SchedulePage() {
   const [area, setArea] = useState<(typeof AREA_TABS)[number]>("西");
   const [monthAnchor, setMonthAnchor] = useState(() => addMonths(new Date(), 0));
@@ -41,7 +34,9 @@ export default function SchedulePage() {
   const [saving, setSaving] = useState(false);
   const { toast, showToast, hideToast } = useToast();
 
-  const { start: periodStart, end: periodEnd } = useMemo(() => nextMonthRange(), []);
+  // 発注書の対象期間は、稼働表で表示中の月（monthAnchor）と常に一致させる
+  // （表示中の月と送信対象の月がズレるバグを防ぐため）。
+  const { start: periodStart, end: periodEnd } = useMemo(() => getMonthRange(monthAnchor), [monthAnchor]);
 
   const [openDriverId, setOpenDriverId] = useState<string | null>(null);
   const [monthDays, setMonthDays] = useState<Map<string, { deliveryDistrictId: string | null; worked: boolean }>>(
