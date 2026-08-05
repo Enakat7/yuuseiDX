@@ -39,7 +39,7 @@ export default function SchedulePage() {
   const [weekDates, setWeekDates] = useState(() => getWeekDates(weekStart));
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { toast, showToast } = useToast();
+  const { toast, showToast, hideToast } = useToast();
 
   const { start: periodStart, end: periodEnd } = useMemo(() => nextMonthRange(), []);
 
@@ -514,7 +514,7 @@ export default function SchedulePage() {
         />
       )}
 
-      <Toast toast={toast} />
+      <Toast toast={toast} onClose={hideToast} />
     </>
   );
 }

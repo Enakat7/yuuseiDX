@@ -1275,6 +1275,23 @@ textarea:focus {
   background: repeating-linear-gradient(45deg, var(--black), var(--black) 2px, var(--white) 2px, var(--white) 4px);
 }
 
+.toast__close {
+  flex-shrink: 0;
+  margin-left: 4px;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--black);
+  font-size: 16px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.toast__close:hover {
+  color: var(--gray-500);
+}
+
 @keyframes toast-in {
   from {
     transform: translateY(8px);
