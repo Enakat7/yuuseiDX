@@ -48,3 +48,23 @@ table {
   font-size: var(--p-fontsize);
   margin-bottom: 10px;
 }
+.achievements {
+  width: 59.5%;
+}
+.breakdown {
+  width: 39.5%;
+}
+th{
+  /* border: #000 1px solid; */
+  padding: 0 5px;
+  height: 12px;
+}
+td{
+  /* border: #000 1px solid; */
+  padding: 0 5px;
+  height: 12px;
+}
+.rowspan-2 {
+  padding: auto 5px;
+  height: 24px;
+}
