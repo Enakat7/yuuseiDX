@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { requireStaffOrAdmin } from "@/lib/apiAuth";
 import type { CountCategory } from "@/types/domain/master";
 
-type Row = CountCategory & { delivery_types: { name: string; price_master_target: boolean } | null };
+type Row = CountCategory & { delivery_types: { name: string; price_master_target: boolean; active: boolean } | null };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== "GET") {
@@ -15,13 +15,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { data, error } = await auth.supabase
     .from("count_categories")
-    .select("*, delivery_types(name, price_master_target)")
+    .select("*, delivery_types(name, price_master_target, active)")
     .order("sort_order");
   if (error) return res.status(500).json({ error: error.message });
 
-  // 単価マスタ対象外の配送種別に紐づく区分は、単価・件数集計・支払通知書・前払依頼書のいずれにも表示しない
+  // 単価マスタ対象外・削除済み（active=false）の配送種別に紐づく区分は、単価・件数集計・支払通知書・前払依頼書のいずれにも表示しない
   const visible: CountCategory[] = ((data as unknown as Row[] | null) ?? [])
-    .filter((row) => row.delivery_types === null || row.delivery_types.price_master_target)
+    .filter((row) => row.delivery_types === null || (row.delivery_types.price_master_target && row.delivery_types.active))
     .map(({ created_at, delivery_type_id, delivery_types, id, label, sort_order, updated_at }) => ({
       created_at,
       delivery_type_id,
