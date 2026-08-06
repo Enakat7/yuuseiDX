@@ -1,14 +1,50 @@
-/* =========================================================
-   YOU SAY!! — mockup design system
-   Style: Neo-Brutalism / Monochrome x Gray / Stylish
-   ========================================================= */
-
 :root {
-  --black: #0a0a0a;
-  --white: #ffffff;
+  --h1-fontsize: 18px;
+  --p-fontsize: 9px;
 }
-
 * {
   margin: 0;
   padding: 0;
+}
+body{
+  border: 1px solid #808080;
+  max-width: 595px;
+  max-height: 842px;
+}
+.header p{
+  text-align: center;
+  font-size: var(--p-fontsize);
+  border-bottom: 1px solid #000;
+  width: 25%;
+  margin-left: auto;
+  margin-bottom: 5px;
+}
+.header h1{
+  text-align: center;
+  font-size: var(--h1-fontsize);
+  margin-bottom: 10px;
+}
+.information-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.payment__info {
+  font-size: var(--p-fontsize);
+  margin-bottom: 10px;
+}
+.driver-information p,
+.driver-account p,
+.company-information p{
+  font-size: var(--p-fontsize);
+}
+.table-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+table {
+  font-size: var(--p-fontsize);
+  margin-bottom: 10px;
 }
