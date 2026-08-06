@@ -27,7 +27,12 @@ const NOTIFICATION_LABELS: Record<keyof NotificationSettings, string> = {
 
 const EMPTY_FORM = { email: "", password: "", name: "", role: "スタッフ" as OperationAccountRole };
 
+const SETTINGS_TABS = ["アカウント・権限", "通知", "CSV/PDF出力", "発注書", "支払通知書", "前払依頼書"] as const;
+type SettingsTab = (typeof SETTINGS_TABS)[number];
+
 export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<SettingsTab>("アカウント・権限");
+
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [notifications, setNotifications] = useState<NotificationSettings>(DEFAULT_NOTIFICATIONS);
   const [pdfTemplate, setPdfTemplate] = useState("標準テンプレート");
@@ -186,7 +191,23 @@ export default function SettingsPage() {
           </p>
         )}
 
-        <div className="grid grid--2">
+        <div className="tabbar" style={{ marginBottom: 22 }}>
+          {SETTINGS_TABS.map((tab) => (
+            <a
+              key={tab}
+              href="#"
+              className={tab === activeTab ? "is-active" : undefined}
+              onClick={(event) => {
+                event.preventDefault();
+                setActiveTab(tab);
+              }}
+            >
+              {tab}
+            </a>
+          ))}
+        </div>
+
+        {activeTab === "アカウント・権限" && (
           <div className="panel">
             <div className="panel__head">
               <h3>アカウント・権限管理</h3>
@@ -245,7 +266,9 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+        )}
 
+        {activeTab === "通知" && (
           <div className="panel">
             <div className="panel__head">
               <h3>通知設定</h3>
@@ -279,24 +302,9 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
+        )}
 
-          <div className="panel">
-            <div className="panel__head">
-              <h3>帳票・発行タイミング</h3>
-            </div>
-            <div className="panel__body">
-              <p className="text-sm">
-                <strong>発注書：</strong>月末にオペレーション担当者が手動で発行操作を行います（自動発行ではありません）。
-              </p>
-              <p className="text-sm">
-                <strong>支払通知書（週払い）：</strong>毎週金曜日に発行します。
-              </p>
-              <p className="text-sm mb-0">
-                <strong>支払通知書（月払い）：</strong>月末締め後に発行します。
-              </p>
-            </div>
-          </div>
-
+        {activeTab === "CSV/PDF出力" && (
           <div className="panel">
             <div className="panel__head">
               <h3>CSV / PDF 出力設定</h3>
@@ -322,7 +330,49 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-        </div>
+        )}
+
+        {activeTab === "発注書" && (
+          <div className="panel">
+            <div className="panel__head">
+              <h3>発注書・発行タイミング</h3>
+            </div>
+            <div className="panel__body">
+              <p className="text-sm mb-0">
+                稼働カレンダーでスタッフが日別に配達地区コードを入力し「確定」すると作成済になります。稼働内容の変更後は自動的に「作成中」に戻り、再確定が必要です。作成済の発注書は「一括送信」でドライバーへ送信します（自動発行ではありません）。ドライバーは内容を確認のうえ「承認」または「修正依頼」を行います。
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "支払通知書" && (
+          <div className="panel">
+            <div className="panel__head">
+              <h3>支払通知書・発行タイミング</h3>
+            </div>
+            <div className="panel__body">
+              <p className="text-sm">
+                <strong>週払い：</strong>毎週金曜日に発行します。
+              </p>
+              <p className="text-sm mb-0">
+                <strong>月払い：</strong>月末締め後に発行します。
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "前払依頼書" && (
+          <div className="panel">
+            <div className="panel__head">
+              <h3>前払依頼書・運用ルール</h3>
+            </div>
+            <div className="panel__body">
+              <p className="text-sm mb-0">
+                承認フローは設けず、申請と同時に確定します。前払可能額は「現時点までの売上 − 当月の控除予定額」で算出し、これを上回る申請は「超過（要確認）」として識別されます（マイナスでも前払い実行は可能です）。
+              </p>
+            </div>
+          </div>
+        )}
       </OperationLayout>
 
       {showCreate && (
