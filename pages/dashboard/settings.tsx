@@ -2,10 +2,13 @@ import Head from "next/head";
 import { useEffect, useState, type FormEvent } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import Modal from "@/components/Modal";
+import PaymentNoticeTemplateEditor from "@/components/PaymentNoticeTemplateEditor";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv } from "@/lib/csv";
 import { OPERATION_PAGE_KEYS, OPERATION_PAGE_LABELS } from "@/lib/pages";
+import { createDefaultTemplate, normalizeTemplate } from "@/lib/paymentNoticeTemplate";
 import type { AccountRow, OperationAccountRole } from "@/types/domain/settings";
+import type { PaymentNoticeTemplate } from "@/types/domain/paymentNoticeTemplate";
 
 type NotificationSettings = {
   payment_confirmed: boolean;
@@ -36,6 +39,7 @@ export default function SettingsPage() {
   const [accounts, setAccounts] = useState<AccountRow[]>([]);
   const [notifications, setNotifications] = useState<NotificationSettings>(DEFAULT_NOTIFICATIONS);
   const [pdfTemplate, setPdfTemplate] = useState("標準テンプレート");
+  const [paymentNoticeTemplate, setPaymentNoticeTemplate] = useState<PaymentNoticeTemplate>(createDefaultTemplate());
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,6 +65,9 @@ export default function SettingsPage() {
       }
       if (typeof appRes.data.pdf_template === "string") {
         setPdfTemplate(appRes.data.pdf_template);
+      }
+      if (appRes.data.payment_notice_template) {
+        setPaymentNoticeTemplate(normalizeTemplate(appRes.data.payment_notice_template));
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "取得に失敗しました。");
@@ -162,6 +169,21 @@ export default function SettingsPage() {
       await apiRequest("/api/settings/app", {
         method: "POST",
         body: JSON.stringify({ key: "pdf_template", value: pdfTemplate }),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "保存に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSavePaymentNoticeTemplate() {
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest("/api/settings/app", {
+        method: "POST",
+        body: JSON.stringify({ key: "payment_notice_template", value: paymentNoticeTemplate }),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "保存に失敗しました。");
@@ -346,19 +368,38 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "支払通知書" && (
-          <div className="panel">
-            <div className="panel__head">
-              <h3>支払通知書・発行タイミング</h3>
+          <>
+            <div className="panel" style={{ marginBottom: 22 }}>
+              <div className="panel__head">
+                <h3>支払通知書・発行タイミング</h3>
+              </div>
+              <div className="panel__body">
+                <p className="text-sm">
+                  <strong>週払い：</strong>毎週金曜日に発行します。
+                </p>
+                <p className="text-sm mb-0">
+                  <strong>月払い：</strong>月末締め後に発行します。
+                </p>
+              </div>
             </div>
-            <div className="panel__body">
-              <p className="text-sm">
-                <strong>週払い：</strong>毎週金曜日に発行します。
-              </p>
-              <p className="text-sm mb-0">
-                <strong>月払い：</strong>月末締め後に発行します。
-              </p>
+
+            <div className="panel">
+              <div className="panel__head">
+                <h3>帳票テンプレート編集</h3>
+                <button
+                  type="button"
+                  className="btn btn--ghost btn--sm"
+                  onClick={handleSavePaymentNoticeTemplate}
+                  disabled={saving}
+                >
+                  {saving ? "保存中..." : "保存"}
+                </button>
+              </div>
+              <div className="panel__body">
+                <PaymentNoticeTemplateEditor value={paymentNoticeTemplate} onChange={setPaymentNoticeTemplate} />
+              </div>
             </div>
-          </div>
+          </>
         )}
 
         {activeTab === "前払依頼書" && (
