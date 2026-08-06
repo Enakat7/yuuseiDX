@@ -66,6 +66,20 @@ export default function MasterDeliveryTypePage() {
     }
   }
 
+  async function handleDelete(type: DeliveryType) {
+    if (!window.confirm(`${type.code}（${type.name}）を削除します。よろしいですか？`)) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await apiRequest(`/api/master/delivery-types/${type.id}`, { method: "DELETE" });
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "削除に失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function handleCreate(event: FormEvent) {
     event.preventDefault();
     if (!form.code || !form.name) {
@@ -272,9 +286,19 @@ export default function MasterDeliveryTypePage() {
                             </span>
                           </td>
                           <td>
-                            <button className="btn btn--sm" onClick={() => startEdit(type)}>
-                              編集
-                            </button>
+                            <div className="flex" style={{ gap: 8 }}>
+                              <button className="btn btn--sm" onClick={() => startEdit(type)}>
+                                編集
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn--sm btn--ghost"
+                                onClick={() => handleDelete(type)}
+                                disabled={saving}
+                              >
+                                削除
+                              </button>
+                            </div>
                           </td>
                         </>
                       )}

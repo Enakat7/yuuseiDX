@@ -7,7 +7,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const { supabase } = auth;
 
   if (req.method === "GET") {
-    const { data, error } = await supabase.from("delivery_types").select("*").order("sort_order");
+    const { data, error } = await supabase
+      .from("delivery_types")
+      .select("*")
+      .eq("active", true)
+      .order("sort_order");
     if (error) return res.status(500).json({ error: error.message });
     return res.status(200).json({ data });
   }
