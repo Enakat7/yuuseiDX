@@ -1,9 +1,10 @@
 import Head from "next/head";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import MasterTabs from "@/components/MasterTabs";
+import ImportModeToggle, { type ImportMode } from "@/components/ImportModeToggle";
 import { apiRequest } from "@/lib/apiClient";
-import { toCsv, downloadCsv } from "@/lib/csv";
+import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import type { Area, DeliveryDistrictWithArea } from "@/types/domain/master";
 
 const COMMON_LABEL = "共通";
@@ -53,6 +54,9 @@ function ColorPaletteInput({ value, onChange }: { value: string; onChange: (hex:
 }
 
 export default function MasterDeliveryDistrictPage() {
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importMode, setImportMode] = useState<ImportMode>("append");
+
   const [areas, setAreas] = useState<Area[]>([]);
   const [districts, setDistricts] = useState<DeliveryDistrictWithArea[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,6 +194,39 @@ export default function MasterDeliveryDistrictPage() {
     downloadCsv("配達地区マスタ.csv", csv);
   }
 
+  async function handleImportFile(file: File) {
+    setSaving(true);
+    setError(null);
+    try {
+      const rows = await parseCsv<{ area: string; code: string; color: string; name: string }>(file, [
+        { key: "area", header: "エリア" },
+        { key: "code", header: "コード" },
+        { key: "color", header: "背景色" },
+        { key: "name", header: "配達地区" },
+      ]);
+
+      const res = await apiRequest<{ imported: number; updated: number; skipped: number }>(
+        "/api/master/delivery-districts/import",
+        {
+          method: "POST",
+          body: JSON.stringify({ rows, mode: importMode }),
+        }
+      );
+
+      if (res.skipped > 0) {
+        setError(
+          `${res.imported}件を新規登録、${res.updated}件を更新しました（${res.skipped}件はコード重複またはエリア不正のためスキップ）。`
+        );
+      }
+
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "インポートに失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <>
       <Head>
@@ -203,7 +240,22 @@ export default function MasterDeliveryDistrictPage() {
               配達地区マスタを管理します。背景色は稼働カレンダー等で日別の担当地区を色分け表示する際に使用します。
             </p>
           </div>
-          <div className="flex">
+          <div className="flex" style={{ gap: 12, alignItems: "center" }}>
+            <ImportModeToggle mode={importMode} onChange={setImportMode} />
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) handleImportFile(file);
+                event.target.value = "";
+              }}
+            />
+            <button className="btn btn--ghost" onClick={() => importInputRef.current?.click()} disabled={saving}>
+              CSVインポート
+            </button>
             <button className="btn btn--ghost" onClick={handleExport}>
               CSVエクスポート
             </button>

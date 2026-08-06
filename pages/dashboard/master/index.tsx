@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import MasterTabs from "@/components/MasterTabs";
 import Modal from "@/components/Modal";
+import ImportModeToggle, { type ImportMode } from "@/components/ImportModeToggle";
 import { apiRequest, fileToBase64 } from "@/lib/apiClient";
 import { useCurrentUser } from "@/lib/currentUser";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
@@ -766,6 +767,7 @@ function DriverGasCardFields({
 export default function MasterDriverPage() {
   const { user } = useCurrentUser();
   const importInputRef = useRef<HTMLInputElement>(null);
+  const [importMode, setImportMode] = useState<ImportMode>("append");
 
   const [areas, setAreas] = useState<Area[]>([]);
   const [districts, setDistricts] = useState<District[]>([]);
@@ -1121,13 +1123,18 @@ export default function MasterDriverPage() {
         { key: "pay_type", header: "支払種別" },
       ]);
 
-      const res = await apiRequest<{ imported: number; skipped: number }>("/api/master/drivers/import", {
-        method: "POST",
-        body: JSON.stringify({ rows }),
-      });
+      const res = await apiRequest<{ imported: number; updated: number; skipped: number }>(
+        "/api/master/drivers/import",
+        {
+          method: "POST",
+          body: JSON.stringify({ rows, mode: importMode }),
+        }
+      );
 
       if (res.skipped > 0) {
-        setError(`${res.imported}件を取り込みました（${res.skipped}件は契約形態などの不正値のためスキップ）。`);
+        setError(
+          `${res.imported}件を新規登録、${res.updated}件を更新しました（${res.skipped}件は契約形態などの不正値のためスキップ）。`
+        );
       }
 
       await loadAll();
@@ -1171,7 +1178,8 @@ export default function MasterDriverPage() {
             <h2>マスタ管理</h2>
             <p className="content__lead">ドライバー・単価・配送種別の各種マスタデータを管理します。</p>
           </div>
-          <div className="flex">
+          <div className="flex" style={{ gap: 12, alignItems: "center" }}>
+            <ImportModeToggle mode={importMode} onChange={setImportMode} />
             <input
               ref={importInputRef}
               type="file"

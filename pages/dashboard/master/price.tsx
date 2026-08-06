@@ -2,6 +2,7 @@ import Head from "next/head";
 import { useEffect, useRef, useState } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import MasterTabs from "@/components/MasterTabs";
+import ImportModeToggle, { type ImportMode } from "@/components/ImportModeToggle";
 import { apiRequest } from "@/lib/apiClient";
 import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import type { Area, DeliveryType, PriceKind, UnitPrice } from "@/types/domain/master";
@@ -21,6 +22,7 @@ function todayIso() {
 
 export default function MasterPricePage() {
   const importInputRef = useRef<HTMLInputElement>(null);
+  const [importMode, setImportMode] = useState<ImportMode>("append");
 
   const [areas, setAreas] = useState<Area[]>([]);
   const [deliveryTypes, setDeliveryTypes] = useState<DeliveryType[]>([]);
@@ -167,12 +169,17 @@ export default function MasterPricePage() {
 
       setDraft((prev) => {
         const next = { ...prev };
+        const setCell = (key: string, value: string) => {
+          // 追加モードでは既に値が入っているセルを上書きせず、空欄のみ埋める
+          if (importMode === "append" && next[key]) return;
+          next[key] = value;
+        };
         for (const row of rows) {
           const dt = priceTargetTypes.find((d) => d.name === row.delivery_type);
           const area = areas.find((a) => a.name === row.area);
           if (!dt || !area) continue;
-          if (row.受注単価) next[cellKey("受注単価", area.id, dt.id)] = row.受注単価;
-          if (row.卸単価) next[cellKey("卸単価", area.id, dt.id)] = row.卸単価;
+          if (row.受注単価) setCell(cellKey("受注単価", area.id, dt.id), row.受注単価);
+          if (row.卸単価) setCell(cellKey("卸単価", area.id, dt.id), row.卸単価);
         }
         return next;
       });
@@ -192,7 +199,8 @@ export default function MasterPricePage() {
             <h2>マスタ管理</h2>
             <p className="content__lead">エリア × 配送種別ごとの受単価・卸単価を管理します。</p>
           </div>
-          <div className="flex">
+          <div className="flex" style={{ gap: 12, alignItems: "center" }}>
+            <ImportModeToggle mode={importMode} onChange={setImportMode} />
             <input
               ref={importInputRef}
               type="file"

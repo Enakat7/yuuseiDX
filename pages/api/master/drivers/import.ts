@@ -23,18 +23,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!auth) return;
   const { supabase } = auth;
 
-  const { rows } = (req.body ?? {}) as { rows?: ImportRow[] };
+  const { rows, mode } = (req.body ?? {}) as { rows?: ImportRow[]; mode?: "append" | "overwrite" };
   if (!Array.isArray(rows)) {
     return res.status(400).json({ error: "rowsが不正です。" });
   }
+  const overwrite = mode === "overwrite";
 
-  const [{ data: areas }, { data: districts }, { data: defaults }] = await Promise.all([
+  const [{ data: areas }, { data: districts }, { data: defaults }, { data: existingDrivers }] = await Promise.all([
     supabase.from("areas").select("*"),
     supabase.from("districts").select("*"),
     supabase.from("deduction_item_defaults").select("label, sort_order"),
+    supabase.from("drivers").select("id, name"),
   ]);
+  // 氏名で既存ドライバーと照合する（CSVにIDを含めない運用のため）。上書き保存モードでのみ使用する。
+  const driverIdByName = new Map((existingDrivers ?? []).map((d) => [d.name, d.id]));
 
   let imported = 0;
+  let updated = 0;
   let skipped = 0;
   for (const row of rows) {
     const area = (areas ?? []).find((a) => a.name === row.area);
@@ -45,22 +50,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       continue;
     }
 
-    const { data: driver, error: driverError } = await supabase
-      .from("drivers")
-      .insert({
-        name: row.name,
-        contract_type: row.contract_type,
-        area_id: area.id,
-        contract_start_date: row.contract_start_date,
-        phone: row.phone || null,
-        email: row.email || null,
-        pay_type: row.pay_type,
-      })
-      .select()
-      .single();
-    if (driverError || !driver) {
-      skipped += 1;
-      continue;
+    const driverFields = {
+      name: row.name,
+      contract_type: row.contract_type,
+      area_id: area.id,
+      contract_start_date: row.contract_start_date,
+      phone: row.phone || null,
+      email: row.email || null,
+      pay_type: row.pay_type,
+    };
+
+    const existingDriverId = overwrite ? driverIdByName.get(row.name) : undefined;
+    let driverId: string;
+    let isNewDriver: boolean;
+
+    if (existingDriverId) {
+      const { data: driver, error: driverError } = await supabase
+        .from("drivers")
+        .update(driverFields)
+        .eq("id", existingDriverId)
+        .select()
+        .single();
+      if (driverError || !driver) {
+        skipped += 1;
+        continue;
+      }
+      driverId = driver.id;
+      isNewDriver = false;
+      // 地区の紐づけをCSVの内容で置き換える
+      await supabase.from("driver_districts").delete().eq("driver_id", driverId);
+    } else {
+      const { data: driver, error: driverError } = await supabase
+        .from("drivers")
+        .insert(driverFields)
+        .select()
+        .single();
+      if (driverError || !driver) {
+        skipped += 1;
+        continue;
+      }
+      driverId = driver.id;
+      isNewDriver = true;
     }
 
     const districtNames = (row.districts ?? "")
@@ -81,26 +111,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
       if (district) {
-        await supabase.from("driver_districts").insert({ driver_id: driver.id, district_id: district.id });
+        await supabase.from("driver_districts").insert({ driver_id: driverId, district_id: district.id });
       }
     }
 
     // 管理費集計（6.4・6.5）の控除項目デフォルト7件をドライバー個別項目としてクローンする
-    // （単発作成のPOST /api/master/driversと同じ処理。CSV一括登録でも抜け漏れなく行う）
-    if (defaults && defaults.length > 0) {
+    // （単発作成のPOST /api/master/driversと同じ処理。新規作成分のみ行い、更新分は
+    // 既存の控除項目をそのまま維持する）。
+    if (isNewDriver && defaults && defaults.length > 0) {
       await supabase.from("deduction_items").insert(
-        defaults.map((d) => ({ driver_id: driver.id, label: d.label, sort_order: d.sort_order }))
+        defaults.map((d) => ({ driver_id: driverId, label: d.label, sort_order: d.sort_order }))
       );
     }
 
-    imported += 1;
+    if (isNewDriver) {
+      imported += 1;
+    } else {
+      updated += 1;
+    }
   }
 
   await logOperation(supabase, {
     action: "CSVインポート",
     screenName: "マスタ管理(ドライバー)",
-    params: { count: imported, skipped },
+    params: { mode: overwrite ? "上書き保存" : "追加", imported, updated, skipped },
   });
 
-  return res.status(200).json({ imported, skipped });
+  return res.status(200).json({ imported, updated, skipped });
 }

@@ -1,14 +1,18 @@
 import Head from "next/head";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import OperationLayout from "@/components/OperationLayout";
 import MasterTabs from "@/components/MasterTabs";
+import ImportModeToggle, { type ImportMode } from "@/components/ImportModeToggle";
 import { apiRequest } from "@/lib/apiClient";
-import { toCsv, downloadCsv } from "@/lib/csv";
+import { toCsv, downloadCsv, parseCsv } from "@/lib/csv";
 import type { DeliveryType } from "@/types/domain/master";
 
 const EMPTY_FORM = { code: "", name: "", priceMasterTarget: false };
 
 export default function MasterDeliveryTypePage() {
+  const importInputRef = useRef<HTMLInputElement>(null);
+  const [importMode, setImportMode] = useState<ImportMode>("append");
+
   const [types, setTypes] = useState<DeliveryType[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -124,6 +128,38 @@ export default function MasterDeliveryTypePage() {
     downloadCsv("配送種別マスタ.csv", csv);
   }
 
+  async function handleImportFile(file: File) {
+    setSaving(true);
+    setError(null);
+    try {
+      const rows = await parseCsv<{ code: string; name: string; target: string }>(file, [
+        { key: "code", header: "コード" },
+        { key: "name", header: "種別名" },
+        { key: "target", header: "単価マスタ対象" },
+      ]);
+
+      const res = await apiRequest<{ imported: number; updated: number; skipped: number }>(
+        "/api/master/delivery-types/import",
+        {
+          method: "POST",
+          body: JSON.stringify({ rows, mode: importMode }),
+        }
+      );
+
+      if (res.skipped > 0) {
+        setError(
+          `${res.imported}件を新規登録、${res.updated}件を更新しました（${res.skipped}件はコード重複または不正値のためスキップ）。`
+        );
+      }
+
+      await loadAll();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "インポートに失敗しました。");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <>
       <Head>
@@ -137,7 +173,22 @@ export default function MasterDeliveryTypePage() {
               配送種別マスタを管理します。単価マスタ対象フラグにより、単価マスタで単価設定が必要な種別かを識別します。
             </p>
           </div>
-          <div className="flex">
+          <div className="flex" style={{ gap: 12, alignItems: "center" }}>
+            <ImportModeToggle mode={importMode} onChange={setImportMode} />
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".csv"
+              style={{ display: "none" }}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) handleImportFile(file);
+                event.target.value = "";
+              }}
+            />
+            <button className="btn btn--ghost" onClick={() => importInputRef.current?.click()} disabled={saving}>
+              CSVインポート
+            </button>
             <button className="btn btn--ghost" onClick={handleExport}>
               CSVエクスポート
             </button>
