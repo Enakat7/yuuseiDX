@@ -371,15 +371,16 @@ insert into public.delivery_types (code, name, price_master_target, sort_order) 
   ('N01', '夜間配送', true, 5),
   ('L01', '大配送', true, 6),
   ('P01', '集荷①', true, 7),
-  ('P02', '集荷②', true, 8);
+  ('P02', '集荷②', true, 8),
+  ('U01', '不在個数', false, 9),
+  ('Y01', 'ゆうパケット', false, 10);
 
 create trigger delivery_types_audit
   after insert or update or delete on public.delivery_types
   for each row execute procedure public.audit_trigger();
 
--- ===== 件数集計の区分（要件6.3で確定した10区分）。配送種別マスタの8種に対応するものは
--- delivery_type_idで紐づけ、ゆうパケット・不在個数は配送種別マスタに含まれない
--- （単価非設定・集計のみ）ためnullとする。 =====
+-- ===== 件数集計の区分（要件6.3で確定した10区分）。配送種別マスタの全10種に
+-- delivery_type_idで紐づける（うち不在個数・ゆうパケットは単価非設定・集計のみ）。 =====
 create table public.count_categories (
   id uuid primary key default gen_random_uuid(),
   label text not null unique,
@@ -402,11 +403,7 @@ create policy "count_categories_staff_or_admin_all"
   with check (public.is_staff_or_admin());
 
 insert into public.count_categories (label, delivery_type_id, sort_order)
-select dt.name, dt.id, dt.sort_order from public.delivery_types dt
-union all
-select 'ゆうパケット', null, 9
-union all
-select '不在個数', null, 10;
+select dt.name, dt.id, dt.sort_order from public.delivery_types dt;
 
 create trigger count_categories_audit
   after insert or update or delete on public.count_categories
@@ -920,16 +917,139 @@ create policy "advance_requests_staff_or_admin_all"
 
 
 -- ============================================================
+-- 元ファイル: 20260803010000_delivery_districts.sql
+-- ============================================================
+-- ===== 配達地区マスタ（エリアごとの配達コース区分。稼働カレンダー等で日別の担当地区を
+-- 色分け表示するために使用する。コード・背景色はクライアント側で自由に割り振ってよいため、
+-- 初期データは doxs/配達地区.md の内容をそのまま投入する。
+-- 「共通」（休・希休等、特定のエリアに属さない区分）はarea_id nullで表現する。 =====
+create table public.delivery_districts (
+  id uuid primary key default gen_random_uuid(),
+  area_id uuid references public.areas (id) on delete cascade,
+  code text not null unique,
+  name text not null,
+  background_color text not null default '#ffffff' check (background_color ~* '^#[0-9a-f]{6}$'),
+  sort_order int not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.delivery_districts enable row level security;
+
+create trigger delivery_districts_set_updated_at
+  before update on public.delivery_districts
+  for each row execute procedure public.set_updated_at();
+
+create policy "delivery_districts_staff_or_admin_all"
+  on public.delivery_districts for all
+  to authenticated
+  using (public.is_staff_or_admin())
+  with check (public.is_staff_or_admin());
+
+-- ドライバーマイページの稼働カレンダーで配達地区コード・色を表示するため、
+-- 配達地区マスタ（コード・名称・色のみで機微情報を含まない）の閲覧を
+-- 認証済み全ユーザーに許可する（更新系は引き続きスタッフ/管理者限定）。
+create policy "delivery_districts_select_authenticated"
+  on public.delivery_districts for select
+  to authenticated
+  using (active = true);
+
+insert into public.delivery_districts (area_id, code, name, background_color, sort_order) values
+  ((select id from public.areas where name = '宇品'), 'U01', '丹那一円・楠那・黄金山・本浦一円・東雲本町3', '#ffffff', 1),
+  ((select id from public.areas where name = '宇品'), 'U02', '仁保一円・日宇那', '#ffffff', 2),
+  ((select id from public.areas where name = '宇品'), 'U03', '東西霞・旭・山城・南北大河', '#ffffff', 3),
+  ((select id from public.areas where name = '宇品'), 'U04', '東雲一円', '#ffffff', 4),
+  ((select id from public.areas where name = '宇品'), 'U05', '翠・西旭・出汐2.3', '#ffffff', 5),
+  ((select id from public.areas where name = '宇品'), 'U06', '大洲・南蟹屋・西蟹屋3.4', '#ffffff', 6),
+  ((select id from public.areas where name = '宇品'), 'U07', '段原・段原日出・段原山崎', '#ffffff', 7),
+  ((select id from public.areas where name = '宇品'), 'U08', '比治山本町・段原南・出汐1.4', '#ffffff', 8),
+  ((select id from public.areas where name = '宇品'), 'U09', '荒神一円・比治山・的場・松川・西蟹屋1.2', '#ffffff', 9),
+  ((select id from public.areas where name = '宇品'), 'U10', '荒神一円・比治山・的場・松川・西蟹屋1.2・霞', '#ffffff', 10),
+  ((select id from public.areas where name = '宇品'), 'U11', '荒神一円・比治山・的場・松川・西蟹屋1.2・段原2', '#ffffff', 11),
+  ((select id from public.areas where name = '宇品'), 'U12', '霞一円・旭・山城・南北大河', '#ffffff', 12),
+  ((select id from public.areas where name = '宇品'), 'U13', '出汐・翠・西旭', '#ffffff', 13),
+  ((select id from public.areas where name = '宇品'), 'U14', '大洲・南蟹屋・西蟹屋・荒神', '#ffffff', 14),
+  ((select id from public.areas where name = '宇品'), 'U15', '段原・段原日出・段原山崎・段原南2', '#ffffff', 15),
+  ((select id from public.areas where name = '宇品'), 'U16', '比治山本町・段原南1・比治山町・的場町・松川町', '#ffffff', 16),
+  ((select id from public.areas where name = '宇品'), 'U17', '霞・東雲本町1・2', '#ffffff', 17),
+  ((select id from public.areas where name = '宇品'), 'U18', '府中郵便局シフト確認', '#f5aa5f', 18),
+
+  ((select id from public.areas where name = '安佐南'), 'A01', '西原1-4', '#ffffff', 19),
+  ((select id from public.areas where name = '安佐南'), 'A02', '西原5.6.8.9', '#ffffff', 20),
+  ((select id from public.areas where name = '安佐南'), 'A03', '中須・古市1-3', '#ffffff', 21),
+  ((select id from public.areas where name = '安佐南'), 'A04', '八木', '#ffffff', 22),
+  ((select id from public.areas where name = '安佐南'), 'A05', '緑井1.3.4.7.8', '#ffffff', 23),
+  ((select id from public.areas where name = '安佐南'), 'A06', '祇園1-3', '#ffffff', 24),
+  ((select id from public.areas where name = '安佐南'), 'A07', '祇園4-8・古市4', '#ffffff', 25),
+  ((select id from public.areas where name = '安佐南'), 'A08', '東原・西原7', '#ffffff', 26),
+  ((select id from public.areas where name = '安佐南'), 'A09', '西原1-4.5.6', '#ffffff', 27),
+  ((select id from public.areas where name = '安佐南'), 'A10', '東原・西原8.9', '#ffffff', 28),
+  ((select id from public.areas where name = '安佐南'), 'A11', '府中郵便局シフト確認', '#f5aa5f', 29),
+
+  ((select id from public.areas where name = '西'), 'N01', '新庄町/三滝本町/山手町/三滝山/己斐東1・2丁目/竜王町', '#ffffff', 30),
+  ((select id from public.areas where name = '西'), 'N02', '己斐上1・3・4・5・6丁目/己斐大迫', '#ffffff', 31),
+  ((select id from public.areas where name = '西'), 'N03', '己斐中1丁目/己斐西/己斐本町', '#ffffff', 32),
+  ((select id from public.areas where name = '西'), 'N04', '己斐中2・3丁目/己斐上2丁目/高須3・4丁目/高須台', '#ffffff', 33),
+  ((select id from public.areas where name = '西'), 'N05', '古江西町/古江東町/高須1・2丁目/古江上', '#ffffff', 34),
+  ((select id from public.areas where name = '西'), 'N06', '庚午南1・2丁目/草津東1・2丁目/古江新町/庚午中2・3丁目/庚午北2・3丁目', '#ffffff', 35),
+  ((select id from public.areas where name = '西'), 'N07', '庚午北1・4丁目/庚午中1・4丁目', '#ffffff', 36),
+  ((select id from public.areas where name = '西'), 'N08', 'bコース', '#ffffff', 37),
+  ((select id from public.areas where name = '西'), 'N09', '己斐大迫/竜王', '#ffffff', 38),
+
+  ((select id from public.areas where name = '中央(中区)'), 'C01', '千田1-3丁目/南千田/大手町5丁目', '#ffffff', 39),
+  ((select id from public.areas where name = '中央(中区)'), 'C02', '東白島/白島九軒/白島中町', '#ffffff', 40),
+  ((select id from public.areas where name = '中央(中区)'), 'C03', '大手町1-4丁目', '#ffffff', 41),
+  ((select id from public.areas where name = '中央(中区)'), 'C04', '堺/榎町/猫屋/小網', '#ffffff', 42),
+  ((select id from public.areas where name = '中央(中区)'), 'C05', '十日市/本川/寺町', '#ffffff', 43),
+  ((select id from public.areas where name = '中央(中区)'), 'C06', '広瀬/広瀬北/西十日市', '#ffffff', 44),
+  ((select id from public.areas where name = '中央(中区)'), 'C07', '白島北/基町/西白島', '#ffffff', 45),
+  ((select id from public.areas where name = '中央(中区)'), 'C08', '上八丁堀', '#ffffff', 46),
+  ((select id from public.areas where name = '中央(中区)'), 'C09', '三川/胡/堀川/新天地', '#ffffff', 47),
+  ((select id from public.areas where name = '中央(中区)'), 'C10', '光南/吉島', '#ffffff', 48),
+  ((select id from public.areas where name = '中央(中区)'), 'C11', '舟入/舟入中/幸/本町一部', '#ffffff', 49),
+  ((select id from public.areas where name = '中央(中区)'), 'C12', '舟入川口/西川口/幸/本町一部', '#ffffff', 50),
+  ((select id from public.areas where name = '中央(中区)'), 'C13', '東白島/白島九軒/白島中・上八丁堀', '#ffffff', 51),
+  ((select id from public.areas where name = '中央(中区)'), 'C14', '東白島/白島九軒/白島中・白島北/西白島', '#ffffff', 52),
+  ((select id from public.areas where name = '中央(中区)'), 'C15', '東白島/白島九軒/白島中・上八丁堀/三川/胡/堀川/新天地', '#ffffff', 53),
+  ((select id from public.areas where name = '中央(中区)'), 'C16', '大手町1-4丁目・三川/胡/堀川/新天地', '#ffffff', 54),
+
+  ((select id from public.areas where name = '中央(東区)'), 'H01', '牛田新町', '#ffffff', 55),
+  ((select id from public.areas where name = '中央(東区)'), 'H02', '牛田本町1.2.3.4・牛田旭・牛田中・牛田早稲田1', '#ffffff', 56),
+  ((select id from public.areas where name = '中央(東区)'), 'H03', '牛田早稲田2.3.4・牛田東', '#ffffff', 57),
+  ((select id from public.areas where name = '中央(東区)'), 'H04', '牛田本町5.6・牛田南・牛田東1.2の一部', '#ffffff', 58),
+  ((select id from public.areas where name = '中央(東区)'), 'H05', '牛田新町・牛田本町5.6', '#ffffff', 59),
+  ((select id from public.areas where name = '中央(東区)'), 'H06', '牛田早稲田2.3.4・牛田東・牛田南', '#ffffff', 60),
+
+  ((select id from public.areas where name = '伴'), 'T01', '大塚西', '#ffffff', 61),
+  ((select id from public.areas where name = '伴'), 'T02', '伴東', '#ffffff', 62),
+  ((select id from public.areas where name = '伴'), 'T03', '伴南、伴西', '#ffffff', 63),
+
+  ((select id from public.areas where name = '府中'), 'F01', '本町・鶴江・山田・瀬戸ハイム・大通（夕方からAコース）', '#ffffff', 64),
+  ((select id from public.areas where name = '府中'), 'F02', '青崎東・中・茂陰・鹿籠・桃山・緑ヶ丘', '#ffffff', 65),
+  ((select id from public.areas where name = '府中'), 'F03', '八幡・柳ヶ丘・浜田', '#ffffff', 66),
+
+  (null, '休', '休日', '#808080', 67),
+  (null, '希休', '希望休', '#e493f5', 68);
+
+create trigger delivery_districts_audit
+  after insert or update or delete on public.delivery_districts
+  for each row execute procedure public.audit_trigger();
+
+-- ============================================================
 -- 元ファイル: 20260729132204_create_schedule_tables.sql
 -- ============================================================
--- 発注書(稼働表)（要件6.1）。稼働日は実データ（日単位）で管理し、
--- 発注書は手動発行、稼働内容変更後は自動で「要再送信」にする。
+-- 発注書(稼働表)（要件6.1）。稼働日は実データ（日単位）で管理する。
+-- 発注書は稼働カレンダーの「確定」操作で作成済になり、稼働内容変更後は
+-- 自動で「作成中」に戻る（要再確定）。「一括送信」は作成済の発注書に対して行い、
+-- 送信によってstatus自体は変更しない（sent_atで送信済かどうかを判定する）。
 
 create table public.work_schedule_days (
   id uuid primary key default gen_random_uuid(),
   driver_id uuid not null references public.drivers (id) on delete cascade,
   work_date date not null,
   worked boolean not null default false,
+  delivery_district_id uuid references public.delivery_districts (id),
   updated_by uuid references public.profiles (id),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
@@ -962,12 +1082,14 @@ create table public.purchase_orders (
   district_id uuid references public.districts (id),
   period_start date not null,
   period_end date not null,
-  status text not null default '未送信' check (status in ('未送信', '送信済', '要再送信')),
+  status text not null default '未作成' check (status in ('未作成', '作成中', '作成済')),
   issued_at timestamptz,
   issued_by uuid references public.profiles (id),
   sent_at timestamptz,
   reissue_count integer not null default 0,
   pdf_storage_path text,
+  driver_approved_at timestamptz,
+  driver_approved_ip text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (driver_id, period_start, period_end)
@@ -989,8 +1111,9 @@ create policy "purchase_orders_staff_or_admin_all"
   using (public.is_staff_or_admin())
   with check (public.is_staff_or_admin());
 
--- 稼働内容が変更された日が、既に送信済の発注書の対象期間に含まれる場合は
--- 「要再送信」に自動変更する（要件6.1）。
+-- 稼働内容が変更された日が、既に作成済の発注書の対象期間に含まれる場合は
+-- 「作成中」に自動的に戻す（再確定が必要なことを示す。あわせてドライバーの
+-- 承認も無効化し、承認後に内容が変わった発注書を承認済のままにしない）。
 create function public.flag_purchase_order_reissue()
 returns trigger
 language plpgsql
@@ -999,9 +1122,9 @@ set search_path = public
 as $$
 begin
   update public.purchase_orders
-  set status = '要再送信'
+  set status = '作成中', driver_approved_at = null, driver_approved_ip = null
   where driver_id = new.driver_id
-    and status = '送信済'
+    and status = '作成済'
     and new.work_date between period_start and period_end;
   return new;
 end;
@@ -1010,6 +1133,57 @@ $$;
 create trigger work_schedule_days_flag_reissue
   after insert or update of worked on public.work_schedule_days
   for each row execute procedure public.flag_purchase_order_reissue();
+
+-- ドライバー本人の発注書のみ承認・修正依頼可能なSECURITY DEFINER RPC
+-- （acknowledge_payment_noticeと同様、引数のorder_idは信用せずcurrent_driver_id()で所有者確認する）。
+create function public.approve_purchase_order(p_order_id uuid, p_ip text default null)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_driver_id uuid;
+begin
+  v_driver_id := public.current_driver_id();
+  if v_driver_id is null then
+    raise exception 'approve_purchase_order: not a driver session';
+  end if;
+
+  update public.purchase_orders
+  set driver_approved_at = now(), driver_approved_ip = p_ip
+  where id = p_order_id and driver_id = v_driver_id;
+
+  if not found then
+    raise exception 'approve_purchase_order: order not found or not owned by driver';
+  end if;
+end;
+$$;
+
+-- 承認とは逆に、稼働表の内容修正が必要なことをスタッフ側（作成中扱い）に戻して示す。
+create function public.request_purchase_order_correction(p_order_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_driver_id uuid;
+begin
+  v_driver_id := public.current_driver_id();
+  if v_driver_id is null then
+    raise exception 'request_purchase_order_correction: not a driver session';
+  end if;
+
+  update public.purchase_orders
+  set status = '作成中', driver_approved_at = null, driver_approved_ip = null
+  where id = p_order_id and driver_id = v_driver_id;
+
+  if not found then
+    raise exception 'request_purchase_order_correction: order not found or not owned by driver';
+  end if;
+end;
+$$;
 
 
 -- ============================================================
@@ -1322,27 +1496,5 @@ update public.document_types set max_files = 2 where label = 'インボイス申
 update public.document_types set max_files = 3 where label = '履歴書';
 update public.document_types set max_files = 2 where label = '貨物軽自動車運送事業経営届出書';
 -- 業務委託契約書は上限なし（max_filesはnullのまま）
-
-
--- ============================================================
--- 元ファイル: 20260802010000_link_count_categories_to_new_delivery_types.sql
--- ============================================================
--- 配送種別マスタに後から追加された「ゆうパック」「不在個数」を、対応する
--- 件数区分（ゆうパケット・不在個数）にdelivery_type_idで紐づける。
--- これにより単価マスタ対象外の配送種別を件数集計等から除外する既存ロジック
--- （pages/api/counts/categories.ts等）が、この2区分にも正しく適用されるようになる。
-update public.count_categories
-set delivery_type_id = dt.id
-from public.delivery_types dt
-where count_categories.label = '不在個数'
-  and count_categories.delivery_type_id is null
-  and dt.code = 'U01';
-
-update public.count_categories
-set delivery_type_id = dt.id
-from public.delivery_types dt
-where count_categories.label = 'ゆうパケット'
-  and count_categories.delivery_type_id is null
-  and dt.code = 'Y01';
 
 
