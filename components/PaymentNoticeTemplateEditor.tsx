@@ -1,9 +1,9 @@
 import { useMemo, useRef, useState, type MouseEvent } from "react";
 import ColorPaletteInput from "@/components/ColorPaletteInput";
+import PaymentNoticeMockupPreview from "@/components/PaymentNoticeMockupPreview";
 import {
   buildEditRows,
   buildSampleData,
-  expandForPreview,
   getCoveredSet,
   insertColumn,
   insertRow,
@@ -47,10 +47,6 @@ export default function PaymentNoticeTemplateEditor({ value, onChange }: Props) 
   const covered = useMemo(() => getCoveredSet(value), [value]);
   const editRows = useMemo(() => buildEditRows(value), [value]);
   const sampleData = useMemo(() => buildSampleData(), []);
-  const previewRows = useMemo(
-    () => (mode === "preview" ? expandForPreview(value, sampleData) : []),
-    [mode, value, sampleData]
-  );
 
   const sel = selection ? normalizeSelection(selection) : null;
   const wholeRowSelected = isWholeRowSelection(sel, value.colCount);
@@ -517,27 +513,7 @@ export default function PaymentNoticeTemplateEditor({ value, onChange }: Props) 
           <p className="hint" style={{ marginBottom: 10 }}>
             サンプルデータで表示しています。実データとの連携は今後対応予定です。
           </p>
-          <table className="template-editor__preview-table">
-            <tbody>
-              {previewRows.map((row) => (
-                <tr key={row.key}>
-                  {row.cells.map((cell) => (
-                    <td
-                      key={cell.col}
-                      rowSpan={cell.rowSpan}
-                      colSpan={cell.colSpan}
-                      className="template-editor__td"
-                      style={{ width: spanWidth(cell.col, cell.colSpan) }}
-                    >
-                      <div className="template-editor__cell" style={{ ...cellBoxStyle(cell.style), cursor: "default" }}>
-                        {cell.content || " "}
-                      </div>
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <PaymentNoticeMockupPreview sample={sampleData} />
         </div>
       )}
     </div>

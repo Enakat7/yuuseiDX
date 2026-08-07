@@ -1499,3 +1499,122 @@ textarea:focus {
   border-spacing: 0;
   table-layout: fixed;
 }
+
+/* ---------- Payment notice mockup preview (mirrors mockup/paymentNotification.html) ---------- */
+
+.pn-mockup {
+  box-sizing: border-box;
+  max-width: 595px;
+  margin: 0 auto;
+  padding: 20px;
+  border: 1px solid #808080;
+  background: #fff;
+  color: #000;
+}
+
+.pn-mockup * {
+  box-sizing: border-box;
+}
+
+.pn-mockup__header p {
+  text-align: center;
+  font-size: 9px;
+  border-bottom: 1px solid #000;
+  width: 25%;
+  margin-left: auto;
+  margin-bottom: 5px;
+}
+
+.pn-mockup__title {
+  text-align: center;
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.pn-mockup__info-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.pn-mockup__payment-info {
+  font-size: 9px;
+  margin-bottom: 10px;
+}
+
+.pn-mockup__driver-info p,
+.pn-mockup__driver-account p,
+.pn-mockup__company-info p {
+  font-size: 9px;
+  margin: 0;
+}
+
+.pn-mockup__under-line {
+  border-bottom: 1px solid #000;
+  margin-bottom: 15px;
+}
+
+.pn-mockup__company-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.pn-mockup__company-logo {
+  width: 60px;
+  height: auto;
+}
+
+.pn-mockup__company-logo img {
+  width: 100%;
+  height: auto;
+}
+
+.pn-mockup__table-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.pn-mockup table {
+  width: 100%;
+  font-size: 9px;
+  margin-bottom: 10px;
+  border-collapse: collapse;
+}
+
+.pn-mockup__achievements {
+  width: 59.5%;
+}
+
+.pn-mockup__breakdown {
+  width: 39.5%;
+}
+
+.pn-mockup__total-section {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.pn-mockup__total {
+  width: 39.5%;
+}
+
+.pn-mockup th,
+.pn-mockup td {
+  border: 1px solid #000;
+  padding: 0 5px;
+  height: 12px;
+  font-weight: 400;
+  text-align: left;
+}
+
+.pn-mockup__cell--total {
+  padding: 4px 5px;
+  height: 27px;
+  font-weight: 700;
+}

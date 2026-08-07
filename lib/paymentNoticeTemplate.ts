@@ -561,25 +561,3 @@ export function buildEditRows(template: PaymentNoticeTemplate): RenderCell[][] {
   }
   return rows;
 }
-
-export type PreviewRow = { key: string; cells: RenderCell[] };
-
-export function expandForPreview(template: PaymentNoticeTemplate, sample: SampleData): PreviewRow[] {
-  const covered = getCoveredSet(template);
-  const repeatingByRow = new Map(template.repeatingRows.map((r) => [r.row, r.source]));
-  const rows: PreviewRow[] = [];
-  for (let row = 0; row < template.rowCount; row++) {
-    const source = repeatingByRow.get(row);
-    if (source) {
-      const list = sample[source] as unknown as Record<string, unknown>[];
-      list.forEach((item, idx) => {
-        const scope = { header: sample.header, summary: sample.summary, [source]: item };
-        rows.push({ key: `${row}-${idx}`, cells: buildRowCells(template, covered, row, scope) });
-      });
-    } else {
-      const scope = { header: sample.header, summary: sample.summary };
-      rows.push({ key: `${row}`, cells: buildRowCells(template, covered, row, scope) });
-    }
-  }
-  return rows;
-}
