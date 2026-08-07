@@ -1609,14 +1609,14 @@ textarea:focus {
 .pn-mockup th,
 .pn-mockup td {
   border: 1px solid #000;
-  padding: 0 5px;
-  height: 12px;
+  padding: 2px 5px;
+  height: 18px;
   font-weight: 400;
   text-align: left;
 }
 
 .pn-mockup td.pn-mockup__cell--total {
   padding: 4px 5px;
-  height: 27px;
+  height: 36px;
   font-weight: 700;
 }
