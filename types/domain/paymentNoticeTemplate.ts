@@ -1,40 +1,9 @@
-export type CellAlign = "left" | "center" | "right";
-export type CellVAlign = "top" | "middle" | "bottom";
-
-export type CellBorders = { top: boolean; right: boolean; bottom: boolean; left: boolean };
-
-export type CellStyle = {
-  bold?: boolean;
-  align?: CellAlign;
-  valign?: CellVAlign;
-  background?: string;
-  fontSize?: number;
-  borders?: CellBorders;
-};
-
-export type TemplateCell = {
-  content: string;
-  rowSpan?: number;
-  colSpan?: number;
-  style?: CellStyle;
-};
-
-export type RepeatingSource = "daily" | "items";
-
-export type RepeatingRegion = {
-  id: string;
-  row: number;
-  source: RepeatingSource;
-};
+export const BREAKDOWN_ITEM_COUNT = 6;
 
 export type PaymentNoticeTemplate = {
-  version: 1;
-  rowCount: number;
-  colCount: number;
-  columnWidths: number[];
-  rowHeights: number[];
-  cells: Record<string, TemplateCell>;
-  repeatingRows: RepeatingRegion[];
+  version: 2;
+  // 明細内訳（pn-mockup__breakdown）の項目行ラベル。行数は固定・項目名のみ編集可能。
+  breakdownItemLabels: string[];
 };
 
 export type HeaderSample = {
@@ -59,16 +28,12 @@ export type HeaderSample = {
 
 export type DailySampleRow = {
   date: string;
-  completed: number;
-  relocation: number;
-  night: number;
-  bulk: number;
-  pickup: number;
-  other: number;
+  // 配送種別マスタのcodeをキーとした件数。実績表(pn-mockup__achievements)の列は
+  // 配送種別マスタ[単価マスタ対象]と連動して動的に決まるため固定フィールドを持たない。
+  counts: Record<string, number>;
 };
 
 export type ItemSampleRow = {
-  category: string;
   qty: number;
   unitPrice: number;
   amount: number;
@@ -89,8 +54,3 @@ export type SampleData = {
   items: ItemSampleRow[];
   summary: SummarySample;
 };
-
-export type TokenDef = { key: string; label: string };
-export type TokenGroup = { namespace: "header" | "daily" | "items" | "summary"; label: string; tokens: TokenDef[] };
-
-export type CellSelection = { r1: number; c1: number; r2: number; c2: number };

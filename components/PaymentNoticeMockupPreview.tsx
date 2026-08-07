@@ -1,20 +1,20 @@
 import Image from "next/image";
 import spbLogo from "@/images/spb-nc.png";
 import type { SampleData } from "@/types/domain/paymentNoticeTemplate";
+import type { DeliveryType } from "@/types/domain/master";
 
-type Props = { sample: SampleData };
+type Props = {
+  sample: SampleData;
+  deliveryTypes: DeliveryType[];
+  breakdownItemLabels: string[];
+  editMode: boolean;
+  onChangeBreakdownLabel: (index: number, label: string) => void;
+};
 
 const ACHIEVEMENT_ROW_COUNT = 31;
 
-const BREAKDOWN_ITEM_LABELS = ["完了数", "転居等", "夜間配送", "繁忙期加算", "大配送", "集荷"] as const;
-const BREAKDOWN_ITEM_CATEGORY: Record<(typeof BREAKDOWN_ITEM_LABELS)[number], string | null> = {
-  完了数: "配達完了",
-  転居等: "転居等",
-  夜間配送: "夜間配送",
-  繁忙期加算: null,
-  大配送: "大配送",
-  集荷: "集荷",
-};
+// 明細内訳スロット(breakdownItemLabelsのindex)→サンプルitemsのindex。nullはデータを持たない行（繁忙期加算）。
+const BREAKDOWN_DATA_SLOT_INDEX: (number | null)[] = [0, 1, 2, null, 3, 4];
 const BREAKDOWN_FILLER_COUNTS = { afterAllowance: 4, afterSales: 6, afterOtherSales: 8 } as const;
 
 function formatJaDate(iso: string): string {
@@ -47,20 +47,19 @@ function BlankRows({ count, cols }: { count: number; cols: number }) {
   );
 }
 
-export default function PaymentNoticeMockupPreview({ sample }: Props) {
+export default function PaymentNoticeMockupPreview({
+  sample,
+  deliveryTypes,
+  breakdownItemLabels,
+  editMode,
+  onChangeBreakdownLabel,
+}: Props) {
   const { header, daily, items, summary } = sample;
+  // 実績表(pn-mockup__achievements)の列は配送種別マスタ[単価マスタ対象]と常に連動する。
+  const achievementColumns = deliveryTypes.filter((t) => t.price_master_target);
+
   const dailyRows = Array.from({ length: ACHIEVEMENT_ROW_COUNT }, (_, i) => daily[i]);
-  const dailyTotals = daily.reduce(
-    (acc, d) => ({
-      completed: acc.completed + d.completed,
-      relocation: acc.relocation + d.relocation,
-      night: acc.night + d.night,
-      bulk: acc.bulk + d.bulk,
-      pickup: acc.pickup + d.pickup,
-      other: acc.other + d.other,
-    }),
-    { completed: 0, relocation: 0, night: 0, bulk: 0, pickup: 0, other: 0 }
-  );
+  const dailyTotals = achievementColumns.map((t) => daily.reduce((sum, d) => sum + (d.counts[t.code] ?? 0), 0));
 
   return (
     <div className="pn-mockup">
@@ -127,12 +126,9 @@ export default function PaymentNoticeMockupPreview({ sample }: Props) {
             <tbody>
               <tr>
                 <th colSpan={2}>日付</th>
-                <th>配達完了</th>
-                <th>転居等</th>
-                <th>夜間配送</th>
-                <th>大配送</th>
-                <th>集荷</th>
-                <th>その他</th>
+                {achievementColumns.map((t) => (
+                  <th key={t.id}>{t.name}</th>
+                ))}
               </tr>
               {dailyRows.map((row, i) => {
                 if (!row) {
@@ -140,12 +136,9 @@ export default function PaymentNoticeMockupPreview({ sample }: Props) {
                     <tr key={i}>
                       <td>mm/dd</td>
                       <td>week</td>
-                      <td></td>
-                      <td></td>
-                      <td></td>
-                      <td></td>
-                      <td></td>
-                      <td></td>
+                      {achievementColumns.map((t) => (
+                        <td key={t.id}></td>
+                      ))}
                     </tr>
                   );
                 }
@@ -154,23 +147,17 @@ export default function PaymentNoticeMockupPreview({ sample }: Props) {
                   <tr key={i}>
                     <td>{mmdd}</td>
                     <td>{week}</td>
-                    <td>{row.completed || ""}</td>
-                    <td>{row.relocation || ""}</td>
-                    <td>{row.night || ""}</td>
-                    <td>{row.bulk || ""}</td>
-                    <td>{row.pickup || ""}</td>
-                    <td>{row.other || ""}</td>
+                    {achievementColumns.map((t) => (
+                      <td key={t.id}>{row.counts[t.code] || ""}</td>
+                    ))}
                   </tr>
                 );
               })}
               <tr className="pn-mockup__total-row">
                 <td colSpan={2}>合計</td>
-                <td>{dailyTotals.completed}</td>
-                <td>{dailyTotals.relocation}</td>
-                <td>{dailyTotals.night}</td>
-                <td>{dailyTotals.bulk}</td>
-                <td>{dailyTotals.pickup}</td>
-                <td>{dailyTotals.other}</td>
+                {dailyTotals.map((total, i) => (
+                  <td key={achievementColumns[i].id}>{total}</td>
+                ))}
               </tr>
             </tbody>
           </table>
@@ -185,12 +172,22 @@ export default function PaymentNoticeMockupPreview({ sample }: Props) {
                 <th>単価(税込)</th>
                 <th>金額(税込)</th>
               </tr>
-              {BREAKDOWN_ITEM_LABELS.map((label) => {
-                const category = BREAKDOWN_ITEM_CATEGORY[label];
-                const item = category ? items.find((it) => it.category === category) : undefined;
+              {breakdownItemLabels.map((label, i) => {
+                const dataIndex = BREAKDOWN_DATA_SLOT_INDEX[i];
+                const item = dataIndex !== null ? items[dataIndex] : undefined;
                 return (
-                  <tr key={label}>
-                    <td>{label}</td>
+                  <tr key={i}>
+                    <td>
+                      {editMode ? (
+                        <input
+                          className="pn-mockup__label-input"
+                          value={label}
+                          onChange={(e) => onChangeBreakdownLabel(i, e.target.value)}
+                        />
+                      ) : (
+                        label
+                      )}
+                    </td>
                     <td>{item ? item.qty : ""}</td>
                     <td>{item ? yen(item.unitPrice) : ""}</td>
                     <td>{item ? yen(item.amount) : ""}</td>
