@@ -1589,11 +1589,11 @@ textarea:focus {
   border: 1px solid #000;
 }
 
-.pn-mockup__achievements {
+.pn-mockup table.pn-mockup__achievements {
   width: 59.5%;
 }
 
-.pn-mockup__breakdown {
+.pn-mockup table.pn-mockup__breakdown {
   width: 39.5%;
 }
 
@@ -1602,7 +1602,7 @@ textarea:focus {
   justify-content: flex-end;
 }
 
-.pn-mockup__total {
+.pn-mockup table.pn-mockup__total {
   width: 39.5%;
 }
 
