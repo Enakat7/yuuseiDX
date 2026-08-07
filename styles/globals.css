@@ -1510,6 +1510,7 @@ textarea:focus {
   border: 1px solid #808080;
   background: #fff;
   color: #000;
+  line-height: 1.2;
 }
 
 .pn-mockup * {
@@ -1569,7 +1570,7 @@ textarea:focus {
 }
 
 .pn-mockup__company-logo img {
-  width: 100%;
+  width: 75%;
   height: auto;
 }
 
@@ -1613,7 +1614,7 @@ textarea:focus {
   text-align: left;
 }
 
-.pn-mockup__cell--total {
+.pn-mockup td.pn-mockup__cell--total {
   padding: 4px 5px;
   height: 27px;
   font-weight: 700;
