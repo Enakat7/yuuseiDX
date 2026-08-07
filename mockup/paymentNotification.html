@@ -18,11 +18,11 @@
           <p>〒<span>＜郵便番号＞</span></p>
           <p>　<span>＜住所＞</span></p>
           <br>
-          <p>　<span>＜氏名＞</span></p>
-          <p>　インボイス番号：<span>＜インボイス番号＞</span></p>
+          <p class="under-line">　<span>＜氏名＞</span></p>
+          <p class="under-line">　インボイス番号：<span>＜インボイス番号＞</span></p>
         </div>
         <div class="driver-account">
-          <p>支払日：<span>yyyy年mm月dd日</span></p>
+          <p class="under-line" style="margin: 5px 0;">支払日：<span>yyyy年mm月dd日</span></p>
           <p>銀行名：<span>＜銀行名＞</span></p>
           <p>支店名：<span>＜支店名＞</span></p>
           <p>口座種別：<span>＜口座種別＞</span></p>
@@ -30,10 +30,15 @@
           <p>口座名義：<span>＜口座名義＞</span></p>
         </div>
         <div class="company-information">
-          <p>株式会社SPB-NC　西原営業所</p>
-          <p>広島市安佐南区西原3-9-14</p>
-          <p>TEL：082-846-4001</p>
-          <p>登録番号：T6240001019638</p>
+          <div class="info">
+            <p>株式会社SPB-NC　西原営業所</p>
+            <p>広島市安佐南区西原3-9-14</p>
+            <p>TEL：082-846-4001</p>
+            <p>登録番号：T6240001019638</p>
+          </div>
+          <div class="img">
+            <img src="./images/spb-nc.png">
+          </div>
         </div>
       </div>
       <p class="payment__info">業務委託費のお支払い金額が下記の通りとなりました。ご不明な点やご質問がございましたらお気軽にお問合せください。</p>
@@ -373,10 +378,10 @@
             <th colspan="4">明細内訳</th>
           </tr>
           <tr class="breakdown__head">
-            <td>項目</td>
-            <td>数量</td>
-            <td>単価(税込)</td>
-            <td>金額(税込)</td>
+            <th>項目</th>
+            <th>数量</th>
+            <th>単価(税込)</th>
+            <th>金額(税込)</th>
           </tr>
           <tr>
             <td>完了数</td>
@@ -538,15 +543,22 @@
             <td></td>
             <td></td>
           </tr>
-          <tr>
-            <td>　</td>
-            <td></td>
-            <td></td>
-            <td></td>
-          </tr>
           <tr class="total-row">
             <td class="rowspan-2"colspan="3">引き去り額合計(税込)</td>
             <td class="rowspan-2"></td>
+          </tr>
+        </table>
+      </div>
+      <div class="total-section">
+        <table border="1" class="total">
+          <tr>
+            <td colspan="1" class="rowspan-2">合計(税込)</td>
+            <td colspan="3" class="rowspan-2">　</td>
+          </tr>
+          <tr>
+            <td colspan="1">内消費税</td>
+            <td colspan="1">10%</td>
+            <td colspan="2">　</td>
           </tr>
         </table>
       </div>

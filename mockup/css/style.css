@@ -6,10 +6,15 @@
   margin: 0;
   padding: 0;
 }
+.under-line {
+  border-bottom: 1px solid #000;
+  margin-bottom: 15px;
+}
 body{
   border: 1px solid #808080;
   max-width: 595px;
   max-height: 842px;
+  padding: 20px;
 }
 .header p{
   text-align: center;
@@ -19,6 +24,7 @@ body{
   margin-left: auto;
   margin-bottom: 5px;
 }
+
 .header h1{
   text-align: center;
   font-size: var(--h1-fontsize);
@@ -39,6 +45,11 @@ body{
 .company-information p{
   font-size: var(--p-fontsize);
 }
+.company-information {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 .table-section {
   display: flex;
   justify-content: space-between;
@@ -48,11 +59,19 @@ table {
   font-size: var(--p-fontsize);
   margin-bottom: 10px;
   border-collapse: collapse;
+  border:#000
 }
 .achievements {
   width: 59.5%;
 }
 .breakdown {
+  width: 39.5%;
+}
+.total-section {
+  display: flex;
+  justify-content: flex-end;
+}
+.total {
   width: 39.5%;
 }
 th{
@@ -65,5 +84,9 @@ td{
 }
 .rowspan-2 {
   padding: auto 5px;
-  height: 24px;
+  height: 27px;
+  font-weight: bold;
+}
+.fontsize-14 {
+  font-size: 14px;
 }
